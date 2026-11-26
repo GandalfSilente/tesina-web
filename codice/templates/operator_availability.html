@@ -1,0 +1,271 @@
+{% extends "base.html" %}
+
+{% block title %}Disponibilità Squadra Operatore • CivicPulse Modena{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+        <div>
+            <span class="badge bg-primary fw-bold mb-1">
+                <i class="fa-solid fa-helmet-safety me-1"></i>CONSOLE OPERATORE TECNICO
+            </span>
+            <h1 class="h3 fw-bold mb-1">Gestione Disponibilità Squadra Operativa</h1>
+            <p class="text-muted small mb-0">
+                Operatore autenticato: <strong>{{ current_user.full_name }}</strong> &bull;
+                Squadra assegnata al tuo profilo: <strong class="text-primary">{{ team.name }}</strong>
+            </p>
+        </div>
+        <a href="{{ url_for('kanban_react') }}" class="btn btn-outline-primary btn-sm fw-semibold">
+            <i class="fa-brands fa-react me-1"></i>Vai alla Kanban Board
+        </a>
+    </div>
+
+    <div id="op-feedback" class="alert d-none shadow-sm small fw-semibold" role="alert"></div>
+
+    <div class="row g-4">
+        <!-- COLONNA SINISTRA: STATO E TOGGLE DISPONIBILITÀ DELLA PROPRIA SQUADRA -->
+        <div class="col-lg-5">
+            <div class="card border-0 shadow-sm rounded-4 p-4 h-100">
+                <h2 class="h5 fw-bold mb-3">
+                    <i class="fa-solid fa-users-gear text-primary me-2"></i>{{ team.name }}
+                </h2>
+                <div class="small text-muted mb-3">
+                    <div><strong>Settore:</strong> {{ team.department }}</div>
+                    <div><strong>Specializzazione:</strong> {{ team.specialization }}</div>
+                    <div><strong>Membri attivi:</strong> {{ team.active_members }} tecnici</div>
+                </div>
+
+                <!-- Box Stato Attuale -->
+                <div id="current-status-box"
+                     class="p-3 rounded-3 mb-4 text-center border {% if team.is_available %}bg-success bg-opacity-10 border-success text-success{% else %}bg-danger bg-opacity-10 border-danger text-danger{% endif %}">
+                    {% if team.is_available %}
+                        <div class="fs-5 fw-bold mb-1">
+                            <i class="fa-solid fa-circle-check me-2"></i>SQUADRA DISPONIBILE
+                        </div>
+                        <small class="d-block text-dark">
+                            Nessun incarico attivo al momento. L'Amministratore può assegnarti un nuovo compito dalla Centrale Operativa.
+                        </small>
+                    {% elif team.is_busy and team.busy_report %}
+                        <div class="fs-5 fw-bold mb-1">
+                            <i class="fa-solid fa-ban me-2"></i>AL MOMENTO INDISPONIBILE (INCARICO IN CORSO)
+                        </div>
+                        <small class="d-block text-dark mb-2">
+                            Ogni squadra può gestire <strong>1 solo incarico alla volta</strong>. Tornerai automaticamente <strong>DISPONIBILE</strong> quando segnerai questo lavoro come completato!
+                        </small>
+                        <div class="p-2 bg-white rounded border border-danger border-opacity-25 small text-danger fw-semibold">
+                            <i class="fa-solid fa-wrench me-1"></i>Lavoro attivo:
+                            <a href="{{ url_for('report_detail', report_id=team.busy_report.id) }}" class="text-danger text-decoration-underline">
+                                {{ team.busy_report.code }} — {{ team.busy_report.title }}
+                            </a>
+                        </div>
+                    {% else %}
+                        <div class="fs-5 fw-bold mb-1">
+                            <i class="fa-solid fa-ban me-2"></i>AL MOMENTO INDISPONIBILE
+                        </div>
+                        <small class="d-block text-dark">
+                            La tua squadra risulta bloccata in rosso per l'Admin e non riceverà nuovi compiti finché non tornerà disponibile.
+                        </small>
+                        {% if team.unavailability_reason or team.unavailable_until %}
+                            <div class="mt-2 pt-2 border-top border-danger border-opacity-25 small text-danger fw-semibold">
+                                {% if team.unavailability_reason %}<div>Motivo: {{ team.unavailability_reason }}</div>{% endif %}
+                                {% if team.unavailable_until %}<div>Rientro previsto: {{ team.unavailable_until }}</div>{% endif %}
+                            </div>
+                        {% endif %}
+                    {% endif %}
+                </div>
+
+                <!-- Dettagli Opzionali Indisponibilità -->
+                <div class="mb-3">
+                    <label for="unavail-reason" class="form-label small fw-semibold">
+                        Motivazione (usata se imposti manualmente come Non Disponibile)
+                    </label>
+                    <input type="text" id="unavail-reason" class="form-control form-control-sm mb-2"
+                           value="{{ team.unavailability_reason or '' }}"
+                           placeholder="es. Mezzo in officina / Fine turno"
+                           {% if team.is_busy %}disabled{% endif %}>
+                    <div class="d-flex flex-wrap gap-1">
+                        <button type="button" class="btn btn-xs btn-light border small py-0 px-2 quick-reason" data-reason="Squadra impegnata in emergenza esterna" {% if team.is_busy %}disabled{% endif %}>
+                            Emergenza in corso
+                        </button>
+                        <button type="button" class="btn btn-xs btn-light border small py-0 px-2 quick-reason" data-reason="Mezzo operativo o attrezzatura in manutenzione" {% if team.is_busy %}disabled{% endif %}>
+                            Mezzo in officina
+                        </button>
+                        <button type="button" class="btn btn-xs btn-light border small py-0 px-2 quick-reason" data-reason="Fine turno operativo" {% if team.is_busy %}disabled{% endif %}>
+                            Fine turno
+                        </button>
+                    </div>
+                </div>
+
+                <div class="mb-4">
+                    <label for="unavail-until" class="form-label small fw-semibold">
+                        Indisponibile fino alle (Opzionale)
+                    </label>
+                    <input type="text" id="unavail-until" class="form-control form-control-sm"
+                           value="{{ team.unavailable_until or '' }}"
+                           placeholder="es. 18:30 oppure Domani 08:00"
+                           {% if team.is_busy %}disabled{% endif %}>
+                </div>
+
+                <!-- Pulsanti Azione Disponibilità -->
+                <div class="d-grid gap-2 mt-auto">
+                    <button type="button" id="btn-set-available"
+                            class="btn btn-success fw-semibold py-2"
+                            {% if team.is_available or team.is_busy %}disabled{% endif %}>
+                        <i class="fa-solid fa-check-circle me-2"></i>
+                        {% if team.is_busy %}
+                            Completa prima l'incarico in corso per tornare disponibile
+                        {% else %}
+                            Imposta Squadra come DISPONIBILE
+                        {% endif %}
+                    </button>
+                    <button type="button" id="btn-set-unavailable"
+                            class="btn btn-danger fw-semibold py-2"
+                            {% if not team.manual_available or team.is_busy %}disabled{% endif %}>
+                        <i class="fa-solid fa-ban me-2"></i>Segna come AL MOMENTO INDISPONIBILE
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- COLONNA DESTRA: COMPITI ASSEGNATI ALLA SQUADRA (CON COMPLETAMENTO RAPIDO) -->
+        <div class="col-lg-7">
+            <div class="card border-0 shadow-sm rounded-4 p-4 h-100">
+                <div class="d-flex justify-content-between align-items-center mb-3 pb-2 border-bottom">
+                    <h2 class="h5 fw-bold mb-0">
+                        <i class="fa-solid fa-clipboard-list text-primary me-2"></i>Compiti Assegnati alla Mia Squadra
+                    </h2>
+                    <span class="badge bg-dark rounded-pill">{{ assigned_reports|length }}</span>
+                </div>
+
+                {% if assigned_reports %}
+                    <div class="list-group list-group-flush">
+                        {% for r in assigned_reports %}
+                            <div class="list-group-item px-0 py-3 {% if r.status in ('in_lavorazione', 'sospesa_meteo') %}bg-warning bg-opacity-10 rounded px-3 mb-2 border{% endif %}">
+                                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-1">
+                                    <div>
+                                        <span class="badge bg-dark me-1">{{ r.code }}</span>
+                                        <span class="badge-status {{ STATUSES[r.status].badge }}">{{ STATUSES[r.status].label }}</span>
+                                        <span class="badge-prio {{ PRIORITIES[r.priority].badge }} ms-1">{{ PRIORITIES[r.priority].label }}</span>
+                                    </div>
+                                    <div class="d-flex gap-2">
+                                        {% if r.status in ('in_lavorazione', 'sospesa_meteo') %}
+                                            <button type="button"
+                                                    class="btn btn-sm btn-success fw-semibold btn-complete-job"
+                                                    data-report-id="{{ r.id }}"
+                                                    data-report-code="{{ r.code }}">
+                                                <i class="fa-solid fa-check-double me-1"></i>Segna Lavoro Completato
+                                            </button>
+                                        {% endif %}
+                                        <a href="{{ url_for('report_detail', report_id=r.id) }}" class="btn btn-sm btn-outline-primary">
+                                            Dettaglio <i class="fa-solid fa-arrow-right ms-1"></i>
+                                        </a>
+                                    </div>
+                                </div>
+                                <h3 class="h6 fw-bold mb-1 mt-2">{{ r.title }}</h3>
+                                <div class="small text-muted">
+                                    <i class="fa-solid fa-location-dot text-danger me-1"></i>{{ r.address }} &bull; {{ r.quartiere }}
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="text-center text-muted py-5">
+                        <i class="fa-solid fa-inbox fs-1 mb-2 d-block"></i>
+                        <p class="fw-semibold mb-1">Nessun compito assegnato a questa squadra al momento.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script defer>
+document.addEventListener("DOMContentLoaded", () => {
+    const teamId = {{ team.id }};
+    const btnAvail = document.getElementById("btn-set-available");
+    const btnUnavail = document.getElementById("btn-set-unavailable");
+    const reasonInput = document.getElementById("unavail-reason");
+    const untilInput = document.getElementById("unavail-until");
+    const feedbackEl = document.getElementById("op-feedback");
+
+    document.querySelectorAll(".quick-reason").forEach(btn => {
+        btn.addEventListener("click", () => {
+            if (reasonInput) reasonInput.value = btn.dataset.reason;
+        });
+    });
+
+    function showOpFeedback(msg, type = "success") {
+        if (!feedbackEl) return;
+        feedbackEl.className = `alert alert-${type} shadow-sm small fw-semibold`;
+        feedbackEl.textContent = msg;
+        feedbackEl.classList.remove("d-none");
+    }
+
+    async function updateAvailability(isAvailable) {
+        if (btnAvail) btnAvail.disabled = true;
+        if (btnUnavail) btnUnavail.disabled = true;
+
+        try {
+            const res = await fetch(`/api/teams/${teamId}/availability`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "Accept": "application/json" },
+                body: JSON.stringify({
+                    is_available: isAvailable,
+                    reason: reasonInput ? reasonInput.value : "",
+                    until_time: untilInput ? untilInput.value : ""
+                })
+            });
+            const data = await res.json();
+            if (!res.ok || data.status !== "ok") {
+                showOpFeedback(data.message || "Errore durante l'aggiornamento.", "danger");
+                return;
+            }
+            window.location.reload();
+        } catch (err) {
+            showOpFeedback("Errore di connessione al server.", "danger");
+        }
+    }
+
+    if (btnAvail) btnAvail.addEventListener("click", () => updateAvailability(true));
+    if (btnUnavail) btnUnavail.addEventListener("click", () => updateAvailability(false));
+
+    // Completamento rapido incarico attivo -> libera subito la squadra!
+    document.querySelectorAll(".btn-complete-job").forEach(btn => {
+        btn.addEventListener("click", async () => {
+            const reportId = btn.dataset.reportId;
+            const reportCode = btn.dataset.reportCode;
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Completamento...';
+            try {
+                const res = await fetch(`/api/reports/${reportId}/status`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json", "Accept": "application/json" },
+                    body: JSON.stringify({ status: "risolta" })
+                });
+                const data = await res.json();
+                if (!res.ok || data.status !== "ok") {
+                    showOpFeedback(data.message || "Impossibile completare il lavoro.", "danger");
+                    btn.disabled = false;
+                    return;
+                }
+                showOpFeedback(`✅ Lavoro ${reportCode} completato! La squadra è ora nuovamente DISPONIBILE.`, "success");
+                setTimeout(() => window.location.reload(), 250);
+            } catch (err) {
+                showOpFeedback("Errore di connessione durante il completamento.", "danger");
+                btn.disabled = false;
+            }
+        });
+    });
+
+    // Riutilizza l'unico canale SSE globale emesso da main.js (0 connessioni aggiuntive!)
+    window.addEventListener("civicpulse:sse", (event) => {
+        const data = event.detail || {};
+        if (data.type === "report_assigned" && data.payload && Number(data.payload.team_id) === teamId) {
+            setTimeout(() => window.location.reload(), 450);
+        }
+    });
+});
+</script>
+{% endblock %}

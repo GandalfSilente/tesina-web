@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <defs>
+    <linearGradient id="powerGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#10b981"/>
+      <stop offset="50%" stop-color="#0ea5e9"/>
+      <stop offset="100%" stop-color="#2563eb"/>
+    </linearGradient>
+    <filter id="glow" x="-15%" y="-15%" width="130%" height="130%">
+      <feDropShadow dx="0" dy="6" stdDeviation="8" flood-color="#0f172a" flood-opacity="0.45"/>
+    </filter>
+  </defs>
+  <!-- Cerchio esterno scuro con bordo luminoso -->
+  <circle cx="128" cy="128" r="114" fill="#0f172a" stroke="url(#powerGrad)" stroke-width="12" filter="url(#glow)"/>
+  <!-- Arco del simbolo ON/OFF (interrotto in alto) -->
+  <path d="M 83 78 A 68 68 0 1 0 173 78" fill="none" stroke="#38bdf8" stroke-width="18" stroke-linecap="round"/>
+  <!-- Stanghetta verticale del simbolo ON/OFF -->
+  <line x1="128" y1="48" x2="128" y2="126" stroke="#10b981" stroke-width="18" stroke-linecap="round"/>
+</svg>

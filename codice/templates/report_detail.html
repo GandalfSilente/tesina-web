@@ -1,0 +1,329 @@
+{% extends "base.html" %}
+
+{% block title %}{{ report.code }} • {{ report.title }} | CivicPulse Modena{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
+{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <!-- Breadcrumb di navigazione -->
+    <nav aria-label="breadcrumb" class="mb-3">
+        <ol class="breadcrumb small mb-0">
+            <li class="breadcrumb-item"><a href="{{ url_for('index') }}" class="text-decoration-none"><i class="fa-solid fa-house me-1"></i>Mappa &amp; Catalogo</a></li>
+            <li class="breadcrumb-item">{{ CATEGORIES[report.category].label }}</li>
+            <li class="breadcrumb-item active" aria-current="page">{{ report.code }}</li>
+        </ol>
+    </nav>
+
+    <div class="row g-4">
+        <!-- COLONNA PRINCIPALE: Dettagli Segnalazione, Explainable AI, Timeline Commenti CRUD -->
+        <div class="col-lg-8">
+            <article class="card border-0 shadow-sm rounded-4 overflow-hidden mb-4">
+                <div class="position-relative" style="height: 290px; background: #0f172a;">
+                    <img src="{{ report.image_url or url_for('static', filename='uploads/demo_buca_dief.svg') }}"
+                         alt="Illustrazione per {{ report.title }}"
+                         class="w-100 h-100" style="object-fit: cover;">
+                    <span class="report-code-pill fs-6 px-3 py-1">{{ report.code }}</span>
+                    <span class="ai-score-pill fs-6 px-3 py-1">
+                        <i class="fa-solid fa-brain me-1"></i>Indice Urgenza AI: {{ report.ai_urgency_score }}/100
+                    </span>
+                </div>
+
+                <div class="card-body p-4">
+                    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+                        <div class="d-flex flex-wrap gap-2">
+                            <span class="badge-status {{ STATUSES[report.status].badge }} fs-6">
+                                <i class="fa-solid {{ STATUSES[report.status].icon }}"></i>
+                                {{ STATUSES[report.status].label }}
+                            </span>
+                            <span class="badge-prio {{ PRIORITIES[report.priority].badge }} fs-6">
+                                Priorità {{ PRIORITIES[report.priority].label }}
+                            </span>
+                            <span class="badge bg-light text-dark border">
+                                <i class="fa-solid {{ CATEGORIES[report.category].icon }} text-primary me-1"></i>
+                                {{ CATEGORIES[report.category].label }}
+                            </span>
+                        </div>
+
+                        <!-- Azioni CRUD Protette da Ruoli (RBAC) -->
+                        <div class="d-flex gap-2">
+                            {% if current_user and (current_user.role in ('operator', 'admin') or current_user.id == report.author_id) %}
+                                <a href="{{ url_for('report_edit', report_id=report.id) }}" class="btn btn-sm btn-outline-primary" title="Modifica dettagli segnalazione">
+                                    <i class="fa-solid fa-pen-to-square me-1"></i>Modifica
+                                </a>
+                            {% endif %}
+
+                            {% if current_user and current_user.role == 'admin' %}
+                                <form method="POST" action="{{ url_for('report_delete', report_id=report.id) }}"
+                                      onsubmit="return confirm('Sei sicuro di voler eliminare definitivamente la segnalazione {{ report.code }}? Azione riservata ad Admin.');">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger" title="Elimina definitivamente (Riservato Admin)">
+                                        <i class="fa-solid fa-trash-can me-1"></i>Elimina Pratica (Admin)
+                                    </button>
+                                </form>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <h1 class="h3 fw-bold mb-3">{{ report.title }}</h1>
+
+                    <p class="lead fs-6 text-secondary mb-4" style="white-space: pre-line;">{{ report.description }}</p>
+
+                    <div class="row g-3 bg-light rounded-3 p-3 border mb-4 small">
+                        <div class="col-sm-6">
+                            <div class="text-muted">Indirizzo / Riferimento</div>
+                            <strong class="text-dark"><i class="fa-solid fa-location-dot text-danger me-1"></i>{{ report.address }}</strong>
+                        </div>
+                        <div class="col-sm-6">
+                            <div class="text-muted">Circoscrizione / Quartiere</div>
+                            <strong class="text-dark">{{ report.quartiere }}</strong>
+                        </div>
+                        <div class="col-sm-4">
+                            <div class="text-muted">Segnalato da</div>
+                            <strong class="text-dark"><i class="fa-solid fa-user me-1"></i>{{ report.author_name }}</strong>
+                        </div>
+                        <div class="col-sm-4">
+                            <div class="text-muted">Data Apertura</div>
+                            <strong class="text-dark">{{ report.created_at }}</strong>
+                        </div>
+                        <div class="col-sm-4">
+                            <div class="text-muted">Ultimo Aggiornamento</div>
+                            <strong class="text-dark">{{ report.updated_at }}</strong>
+                        </div>
+                    </div>
+
+                    <!-- PANNELLO EXPLAINABLE AI & AUTO-TRIAGE ("Sporcarsi le Mani") -->
+                    <div class="ai-triage-panel mb-2">
+                        <div class="d-flex flex-wrap justify-content-between align-items-center mb-2">
+                            <div class="d-flex align-items-center gap-2">
+                                <i class="fa-solid fa-microchip text-info fs-5"></i>
+                                <h2 class="h6 fw-bold mb-0 text-white">Analisi Automatica AI/NLP &amp; Valutazione SLA</h2>
+                            </div>
+                            <span class="badge bg-info text-dark fw-bold">SLA Stimato: {{ report.ai_estimated_sla_hours }} ore</span>
+                        </div>
+                        <div class="urgency-meter-bg mb-2">
+                            <div class="urgency-meter-fill"
+                                 style="width: {{ report.ai_urgency_score }}%; background-color: {% if report.ai_urgency_score >= 80 %}#ef4444{% elif report.ai_urgency_score >= 60 %}#f97316{% else %}#38bdf8{% endif %};"></div>
+                        </div>
+                        <p class="small text-light opacity-90 mb-2">{{ report.ai_reasoning }}</p>
+                        <div class="d-flex flex-wrap gap-3 small text-info">
+                            <span><i class="fa-solid fa-users-gear me-1"></i>Squadra assegnata: <strong>{{ report.team_name or 'In assegnazione' }}</strong></span>
+                            {% if report.weather_sensitive %}
+                                <span class="text-warning">
+                                    <i class="fa-solid fa-cloud-sun-rain me-1"></i>Intervento sensibile al meteo (Oggi a Modena: {{ weather.condition_label }}, {{ weather.temperature_c }}°C)
+                                </span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </article>
+
+            <!-- SEZIONE TIMELINE COMMENTI E NOTE OPERATIVE (CRUD COMPLETO SUI COMMENTI) -->
+            <section class="card border-0 shadow-sm rounded-4 p-4" aria-label="Timeline commenti e note tecniche">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h2 class="h5 fw-bold mb-0">
+                        <i class="fa-solid fa-comments text-primary me-2"></i> Diario Operativo &amp; Commenti Cittadini ({{ report.comments|length }})
+                    </h2>
+                    <span class="badge bg-secondary">Operazioni CRUD abilitate</span>
+                </div>
+
+                <!-- Lista Commenti -->
+                <div id="comments-list" class="mb-4">
+                    {% if report.comments %}
+                        {% for c in report.comments %}
+                            <div class="comment-item {% if c.is_official_update %}official-update{% endif %}" id="comment-{{ c.id }}">
+                                <div class="d-flex flex-wrap justify-content-between align-items-center mb-1">
+                                    <div>
+                                        <strong>{{ c.author_name }}</strong>
+                                        {% if c.is_official_update %}
+                                            <span class="badge bg-primary ms-1"><i class="fa-solid fa-shield-halved me-1"></i>Nota Tecnica Ufficiale</span>
+                                        {% else %}
+                                            <span class="badge bg-light text-secondary border ms-1">{{ c.author_role }}</span>
+                                        {% endif %}
+                                        <small class="text-muted ms-2">{{ c.created_at }}</small>
+                                    </div>
+
+                                    <!-- Pulsanti Modifica / Elimina Commento (Riservati all'Autore o ad Admin) -->
+                                    {% if current_user and (current_user.id == c.author_id or current_user.role == 'admin') %}
+                                        <div class="d-flex gap-1">
+                                            <button type="button" class="btn btn-sm btn-link text-decoration-none p-1"
+                                                    onclick="document.getElementById('edit-box-{{ c.id }}').classList.toggle('d-none')">
+                                                <i class="fa-solid fa-pen"></i> Modifica
+                                            </button>
+                                            <form method="POST" action="{{ url_for('api_remove_comment', comment_id=c.id) }}" class="d-inline"
+                                                  onsubmit="return confirm('Rimuovere questo commento?');">
+                                                <button type="submit" class="btn btn-sm btn-link text-danger text-decoration-none p-1">
+                                                    <i class="fa-solid fa-trash"></i> Elimina
+                                                </button>
+                                            </form>
+                                        </div>
+                                    {% endif %}
+                                </div>
+
+                                <p class="mb-1 small text-dark">{{ c.content }}</p>
+
+                                <!-- Box Modifica Inline del Commento (UPDATE Comment) -->
+                                <form id="edit-box-{{ c.id }}" method="POST" action="{{ url_for('api_edit_comment', comment_id=c.id) }}" class="d-none mt-2">
+                                    <div class="input-group input-group-sm">
+                                        <input type="text" name="content" value="{{ c.content }}" class="form-control" required minlength="3" maxlength="1000">
+                                        <button type="submit" class="btn btn-primary">Salva</button>
+                                    </div>
+                                </form>
+                            </div>
+                        {% endfor %}
+                    {% else %}
+                        <p class="text-muted small fst-italic">Nessuna nota operativa ancora presente per questa segnalazione. Aggiungi il primo aggiornamento qui sotto.</p>
+                    {% endif %}
+                </div>
+
+                <!-- Form Inserimento Nuovo Commento (CREATE Comment) -->
+                <form method="POST" action="{{ url_for('api_add_comment', report_id=report.id) }}" class="border-top pt-3">
+                    <label for="comment-content" class="form-label fw-semibold small">
+                        <i class="fa-solid fa-plus-circle text-primary me-1"></i>Aggiungi un commento o un aggiornamento di cantiere
+                    </label>
+                    <textarea id="comment-content" name="content" rows="3" class="form-control mb-2"
+                              placeholder="Inserisci un aggiornamento sullo stato dei lavori, un sopralluogo effettuato o un riscontro civico (min 3 caratteri)..."
+                              required minlength="3" maxlength="1000"></textarea>
+
+                    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+                        {% if current_user and current_user.role in ('operator', 'admin') %}
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="is_official_update" name="is_official_update" value="1" checked>
+                                <label class="form-check-label small fw-semibold text-primary" for="is_official_update">
+                                    Contrassegna come Nota Tecnica Ufficiale del Comune
+                                </label>
+                            </div>
+                        {% else %}
+                            <small class="text-muted">Pubblicherai come: <strong>{{ current_user.full_name if current_user else 'Cittadino Verificato (Demo)' }}</strong></small>
+                        {% endif %}
+
+                        <button type="submit" class="btn btn-primary btn-sm px-4">
+                            <i class="fa-solid fa-paper-plane me-1"></i>Pubblica Nota
+                        </button>
+                    </div>
+                </form>
+            </section>
+        </div>
+
+        <!-- COLONNA LATERALE: Mappa Puntuale, Azioni Rapide Operatore & Crowdsensing -->
+        <aside class="col-lg-4">
+            <!-- Card Localizzazione GPS Puntuale -->
+            <div class="card border-0 shadow-sm rounded-4 p-3 mb-4">
+                <h2 class="h6 fw-bold mb-2">
+                    <i class="fa-solid fa-location-crosshairs text-danger me-1"></i>Geolocalizzazione Intervento
+                </h2>
+                <div id="detail-map"
+                     data-lat="{{ report.latitude }}"
+                     data-lon="{{ report.longitude }}"
+                     data-title="{{ report.title }}"
+                     data-code="{{ report.code }}"
+                     class="mb-2"></div>
+                <div class="d-flex justify-content-between small text-muted">
+                    <span>Lat: <code>{{ "%.4f"|format(report.latitude) }}</code></span>
+                    <span>Lon: <code>{{ "%.4f"|format(report.longitude) }}</code></span>
+                </div>
+            </div>
+
+            <!-- Card Conferma Cittadina (Crowdsensing Validation) -->
+            <div class="card border-0 shadow-sm rounded-4 p-4 mb-4 text-center">
+                <h2 class="h6 fw-bold mb-1">Validazione Crowdsensing</h2>
+                <p class="small text-muted mb-3">Hai riscontrato anche tu questo problema sul posto? Conferma la segnalazione per aumentarne la visibilità.</p>
+                <button type="button" class="btn btn-primary w-100 btn-upvote" data-report-id="{{ report.id }}">
+                    <i class="fa-solid fa-thumbs-up me-2"></i>Conferma Segnalazione (<span class="upvote-count">{{ report.upvotes }}</span>)
+                </button>
+            </div>
+
+            <!-- Card Pannello Rapido Operatore / Centrale Operativa (RBAC) -->
+            {% if current_user and current_user.role in ('operator', 'admin') %}
+                <div class="card border-0 shadow-sm rounded-4 p-4 bg-white">
+                    <div class="d-flex align-items-center gap-2 mb-3">
+                        <span class="badge bg-dark"><i class="fa-solid fa-helmet-safety"></i></span>
+                        <h2 class="h6 fw-bold mb-0">Pannello Gestione Stato &amp; Squadra</h2>
+                    </div>
+                    <form method="POST" action="{{ url_for('api_update_report_status', report_id=report.id) }}">
+                        <div class="mb-3">
+                            <label for="quick-status" class="form-label small fw-semibold">Stato Operativo Pratica</label>
+                            <select id="quick-status" name="status" class="form-select form-select-sm">
+                                {% for key, st in STATUSES.items() %}
+                                    <option value="{{ key }}" {% if report.status == key %}selected{% endif %}>{{ st.label }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="quick-priority" class="form-label small fw-semibold">Livello di Priorità</label>
+                            <select id="quick-priority" name="priority" class="form-select form-select-sm">
+                                {% for key, pr in PRIORITIES.items() %}
+                                    <option value="{{ key }}" {% if report.priority == key %}selected{% endif %}>{{ pr.label }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="quick-team" class="form-label small fw-semibold">
+                                Squadra Tecnica Incaricata
+                                {% if current_user.role != 'admin' %}
+                                    <small class="text-muted fw-normal">(riservata ad Admin)</small>
+                                {% endif %}
+                            </label>
+                            <select id="quick-team" name="assigned_team_id" class="form-select form-select-sm" {% if current_user.role != 'admin' %}disabled{% endif %}>
+                                {% for t in teams %}
+                                    <option value="{{ t.id }}"
+                                            {% if report.assigned_team_id == t.id %}selected{% endif %}
+                                            {% if not t.is_available and report.assigned_team_id != t.id %}disabled class="text-danger"{% endif %}>
+                                        {{ t.name }}{% if not t.is_available %} — AL MOMENTO INDISPONIBILE{% endif %}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <button type="submit" class="btn btn-dark btn-sm w-100">
+                            <i class="fa-solid fa-arrows-rotate me-1"></i>Aggiorna Stato &amp; Notifica Live (SSE)
+                        </button>
+                    </form>
+                </div>
+            {% else %}
+                <div class="card border-0 shadow-sm rounded-4 p-4 bg-light text-center">
+                    <div class="mb-2"><i class="fa-solid fa-lock text-secondary fs-3"></i></div>
+                    <h2 class="h6 fw-bold mb-1">Pannello Operativo Riservato</h2>
+                    <p class="small text-muted mb-3">
+                        L'aggiornamento dello stato della pratica e l'assegnazione delle squadre sono riservati al personale <strong>Operatore Tecnico</strong> e <strong>Amministratore</strong>.
+                    </p>
+                    <a href="{{ url_for('login') }}" class="btn btn-sm btn-outline-dark">
+                        <i class="fa-solid fa-right-to-bracket me-1"></i>Accedi come Operatore o Admin
+                    </a>
+                </div>
+            {% endif %}
+        </aside>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin="" defer></script>
+<script defer>
+document.addEventListener("DOMContentLoaded", function () {
+    const mapEl = document.getElementById("detail-map");
+    if (mapEl && window.L) {
+        const lat = parseFloat(mapEl.dataset.lat || "44.6471");
+        const lon = parseFloat(mapEl.dataset.lon || "10.9252");
+        const modenaBounds = [[44.5850, 10.8350], [44.7150, 11.0150]];
+        const map = L.map("detail-map", {
+            maxBounds: modenaBounds,
+            maxBoundsViscosity: 1.0,
+            minZoom: 12,
+            maxZoom: 19
+        }).setView([lat, lon], 16);
+        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+            minZoom: 12,
+            maxZoom: 19,
+            attribution: "&copy; OpenStreetMap contributors"
+        }).addTo(map);
+        L.marker([lat, lon]).addTo(map)
+            .bindPopup("<strong>" + mapEl.dataset.code + "</strong><br>" + mapEl.dataset.title)
+            .openPopup();
+    }
+});
+</script>
+{% endblock %}

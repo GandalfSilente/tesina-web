@@ -1,0 +1,304 @@
+{% extends "base.html" %}
+
+{% block title %}{% if is_edit %}Modifica {{ report.code }}{% else %}Nuova Segnalazione Urbana{% endif %} • CivicPulse Modena{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
+{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-xl-10">
+            <div class="d-flex flex-wrap justify-content-between align-items-center mb-3">
+                <div>
+                    <h1 class="h3 fw-bold mb-1">
+                        {% if is_edit %}
+                            <i class="fa-solid fa-pen-to-square text-primary me-2"></i>Modifica Segnalazione {{ report.code }}
+                        {% else %}
+                            <i class="fa-solid fa-plus-circle text-primary me-2"></i>Nuova Segnalazione Urbana Georeferenziata
+                        {% endif %}
+                    </h1>
+                    <p class="text-muted small mb-0">
+                        Compila i dettagli del problema. Il motore <strong>AI/NLP Auto-Triage</strong> analizzerà in tempo reale il testo per stimare urgenza, SLA e squadra competente.
+                    </p>
+                </div>
+                <a href="{{ url_for('report_detail', report_id=report.id) if is_edit else url_for('index') }}" class="btn btn-outline-secondary btn-sm">
+                    <i class="fa-solid fa-arrow-left me-1"></i>Annulla e Torna Indietro
+                </a>
+            </div>
+
+            <!-- Box Errori di Validazione Server-Side -->
+            {% if errors %}
+                <div class="alert alert-danger shadow-sm rounded-3 mb-4" role="alert">
+                    <h2 class="h6 fw-bold mb-2"><i class="fa-solid fa-triangle-exclamation me-2"></i>Verifica i seguenti campi prima di procedere:</h2>
+                    <ul class="mb-0 small">
+                        {% for err in errors %}
+                            <li>{{ err }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            {% endif %}
+
+            <div class="row g-4">
+                <!-- COLONNA FORM PRINCIPALE -->
+                <div class="col-lg-7">
+                    <form id="report-form"
+                          method="POST"
+                          enctype="multipart/form-data"
+                          action="{{ url_for('report_edit', report_id=report.id) if is_edit else url_for('report_create') }}"
+                          novalidate
+                          class="card border-0 shadow-sm rounded-4 p-4">
+
+                        <div class="mb-3">
+                            <label for="title" class="form-label fw-semibold">
+                                Titolo Sintetico della Segnalazione <span class="text-danger">*</span>
+                            </label>
+                            <input type="text" id="title" name="title"
+                                   value="{{ form_data.title }}"
+                                   class="form-control"
+                                   placeholder="Es. Buca profonda su pista ciclabile Via Vivarelli"
+                                   required minlength="8" maxlength="140">
+                            <div class="d-flex justify-content-between small text-muted mt-1">
+                                <span id="title-feedback" class="text-danger"></span>
+                                <span><span id="title-counter">0</span>/140 caratteri (min 8)</span>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="description" class="form-label fw-semibold">
+                                Descrizione Dettagliata e Contesto <span class="text-danger">*</span>
+                            </label>
+                            <textarea id="description" name="description" rows="4"
+                                      class="form-control"
+                                      placeholder="Descrivi il problema riscontrato, eventuali rischi per pedoni/ciclisti e punti di riferimento precisi (minimo 20 caratteri)..."
+                                      required minlength="20" maxlength="2000">{{ form_data.description }}</textarea>
+                            <div class="d-flex justify-content-between small text-muted mt-1">
+                                <span id="desc-feedback" class="text-danger"></span>
+                                <span><span id="desc-counter">0</span>/2000 caratteri (min 20)</span>
+                            </div>
+                        </div>
+
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-6">
+                                <label for="category" class="form-label fw-semibold">
+                                    Categoria Infrastrutturale <span class="text-danger">*</span>
+                                </label>
+                                <select id="category" name="category" class="form-select" required>
+                                    {% for key, cat in CATEGORIES.items() %}
+                                        <option value="{{ key }}" {% if form_data.category == key %}selected{% endif %}>
+                                            {{ cat.label }}
+                                        </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+
+                            <div class="col-md-6">
+                                <label for="priority" class="form-label fw-semibold">
+                                    Priorità (Suggerita da AI o Manuale)
+                                </label>
+                                <select id="priority" name="priority" class="form-select">
+                                    {% for key, pr in PRIORITIES.items() %}
+                                        <option value="{{ key }}" {% if form_data.priority == key %}selected{% endif %}>
+                                            {{ pr.label }}
+                                        </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+
+                        {% if is_edit %}
+                            <div class="row g-3 mb-3">
+                                <div class="col-md-6">
+                                    <label for="status" class="form-label fw-semibold">Stato Operativo</label>
+                                    <select id="status" name="status" class="form-select">
+                                        {% for key, st in STATUSES.items() %}
+                                            <option value="{{ key }}" {% if form_data.status == key %}selected{% endif %}>
+                                                {{ st.label }}
+                                            </option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="assigned_team_id" class="form-label fw-semibold">Squadra Assegnata</label>
+                                    <select id="assigned_team_id" name="assigned_team_id" class="form-select">
+                                        {% for t in teams %}
+                                            <option value="{{ t.id }}" {% if form_data.assigned_team_id == t.id %}selected{% endif %}>
+                                                {{ t.name }}
+                                            </option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                            </div>
+                        {% endif %}
+
+                        <!-- Opzione Rapida: Posizione Attuale o Selezione da Mappa con Reverse Geocoding -->
+                        <div class="p-3 rounded-3 bg-primary bg-opacity-10 border border-primary border-opacity-25 mb-3">
+                            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+                                <div>
+                                    <div class="fw-bold small text-primary">
+                                        <i class="fa-solid fa-location-crosshairs me-1"></i>Non conosci il nome esatto della via?
+                                    </div>
+                                    <small class="text-secondary d-block">
+                                        Premi <strong>Usa Posizione Attuale</strong> oppure <strong>clicca un punto sulla mappa a destra</strong>: l'indirizzo più vicino e il quartiere verranno compilati in automatico!
+                                    </small>
+                                </div>
+                                <button type="button" id="btn-use-current-pos-form" class="btn btn-primary btn-sm fw-semibold shadow-sm">
+                                    <i class="fa-solid fa-location-arrow me-1"></i>Usa Posizione Attuale
+                                </button>
+                            </div>
+                            <div id="geo-auto-status" class="small text-success fw-semibold mt-2 d-none"></div>
+                        </div>
+
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-6">
+                                <label for="quartiere" class="form-label fw-semibold">
+                                    Quartiere / Circoscrizione <span class="text-danger">*</span>
+                                </label>
+                                <select id="quartiere" name="quartiere" class="form-select" required>
+                                    {% for q in QUARTIERI_MODENA %}
+                                        <option value="{{ q }}" {% if form_data.quartiere == q %}selected{% endif %}>{{ q }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+
+                            <div class="col-md-6">
+                                <label for="address" class="form-label fw-semibold">
+                                    Indirizzo o Punto di Riferimento <span class="text-danger">*</span>
+                                    <span class="badge bg-info text-dark ms-1 fw-normal">Auto da Mappa/GPS</span>
+                                </label>
+                                <input type="text" id="address" name="address"
+                                       value="{{ form_data.address }}"
+                                       class="form-control"
+                                       placeholder="Clicca sulla mappa o premi 'Usa Posizione Attuale'..."
+                                       required minlength="5" maxlength="160">
+                                <div id="address-feedback" class="small text-danger mt-1"></div>
+                            </div>
+                        </div>
+
+                        <!-- Coordinate Geografiche sincronizzate con la mappa (bloccate sul Comune di Modena) -->
+                        <div class="row g-3 mb-3">
+                            <div class="col-sm-6">
+                                <label for="latitude" class="form-label small fw-semibold text-secondary">Latitudine GPS (Comune di Modena: 44.5850–44.7150)</label>
+                                <input type="number" step="0.0001" min="44.5850" max="44.7150" id="latitude" name="latitude"
+                                       value="{{ form_data.latitude }}" class="form-control form-control-sm" required>
+                            </div>
+                            <div class="col-sm-6">
+                                <label for="longitude" class="form-label small fw-semibold text-secondary">Longitudine GPS (Comune di Modena: 10.8350–11.0150)</label>
+                                <input type="number" step="0.0001" min="10.8350" max="11.0150" id="longitude" name="longitude"
+                                       value="{{ form_data.longitude }}" class="form-control form-control-sm" required>
+                            </div>
+                        </div>
+
+                        <!-- Upload Immagine Opzionale -->
+                        <div class="mb-4">
+                            <label for="image_file" class="form-label fw-semibold">
+                                <i class="fa-solid fa-camera me-1 text-primary"></i>Foto / Allegato Documentale (Opzionale)
+                            </label>
+                            <input type="file" id="image_file" name="image_file"
+                                   accept=".png,.jpg,.jpeg,.webp,.svg" class="form-control">
+                            <div class="form-text">
+                                Formati accettati: PNG, JPG, WEBP, SVG (max 8 MB). Se omesso, verrà associata un'illustrazione vettoriale di categoria.
+                            </div>
+                        </div>
+
+                        <div class="d-grid gap-2 d-sm-flex justify-content-sm-end">
+                            <button type="submit" id="btn-submit-report" class="btn btn-primary px-4 py-2 fw-semibold">
+                                <i class="fa-solid fa-paper-plane me-2"></i>
+                                {% if is_edit %}Salva Modifiche{% else %}Registra Segnalazione &amp; Avvia Triage{% endif %}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- COLONNA DESTRA: AI AUTO-TRIAGE IN TEMPO REALE + MAPPA GPS PICKER -->
+                <div class="col-lg-5">
+                    <!-- Box AI Auto-Triage Live -->
+                    <div class="ai-triage-panel mb-4">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <div class="d-flex align-items-center gap-2">
+                                <i class="fa-solid fa-wand-magic-sparkles text-info fs-5"></i>
+                                <h2 class="h6 fw-bold mb-0 text-white">Co-Pilota AI/NLP di Auto-Triage</h2>
+                            </div>
+                            <button type="button" id="btn-run-ai" class="btn btn-sm btn-info text-dark fw-semibold">
+                                <i class="fa-solid fa-bolt me-1"></i>Analizza Testo
+                            </button>
+                        </div>
+                        <p class="small text-secondary mb-3">
+                            Digita titolo e descrizione: l'algoritmo NLP valuta in tempo reale la criticità semantica e propone categoria, priorità e SLA.
+                        </p>
+
+                        <div class="p-3 rounded-3 bg-dark bg-opacity-50 border border-secondary mb-3">
+                            <div class="d-flex justify-content-between small mb-1">
+                                <span>Indice di Urgenza Stimato:</span>
+                                <strong id="ai-live-score" class="text-info">50 / 100</strong>
+                            </div>
+                            <div class="urgency-meter-bg mb-3">
+                                <div id="ai-live-bar" class="urgency-meter-fill" style="width: 50%; background-color: #38bdf8;"></div>
+                            </div>
+
+                            <div class="row g-2 small">
+                                <div class="col-6">
+                                    <span class="text-secondary d-block">Categoria Suggerita:</span>
+                                    <strong id="ai-live-category" class="text-white">Strade &amp; Viabilità</strong>
+                                </div>
+                                <div class="col-6">
+                                    <span class="text-secondary d-block">SLA Stimato:</span>
+                                    <strong id="ai-live-sla" class="text-warning">48 ore</strong>
+                                </div>
+                                <div class="col-12 mt-2">
+                                    <span class="text-secondary d-block">Squadra Consigliata:</span>
+                                    <strong id="ai-live-team" class="text-info">Squadra Manutenzione Stradale &amp; Segnaletica</strong>
+                                </div>
+                            </div>
+                        </div>
+
+                        <p id="ai-live-reasoning" class="small text-light opacity-90 mb-2 fst-italic">
+                            In attesa di inserimento testo per eseguire il triage automatico...
+                        </p>
+
+                        <button type="button" id="btn-apply-ai" class="btn btn-sm btn-outline-info w-100">
+                            <i class="fa-solid fa-check-double me-1"></i>Applica Categoria e Priorità Suggerite dall'AI
+                        </button>
+                    </div>
+
+                    <!-- Mappa Interattiva per Selezione Coordinate + Sensore GPS Browser -->
+                    <div class="card border-0 shadow-sm rounded-4 p-3">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h2 class="h6 fw-bold mb-0">
+                                <i class="fa-solid fa-map-pin text-danger me-1"></i>Mappa Comune di Modena
+                            </h2>
+                            <button type="button" id="btn-use-gps" class="btn btn-sm btn-outline-primary">
+                                <i class="fa-solid fa-location-crosshairs me-1"></i>Usa Mio GPS
+                            </button>
+                        </div>
+                        <small class="text-muted d-block mb-2">
+                            Mappa circoscritta al <strong>Comune di Modena</strong> (i comuni limitrofi sono bloccati). Clicca un punto o trascina il marker per compilare la via più vicina.
+                        </small>
+                        <div id="picker-map" class="mb-2"></div>
+                        <div class="d-flex flex-wrap gap-1">
+                            <button type="button" class="btn btn-xs btn-light border small py-1 px-2 preset-loc"
+                                    data-lat="44.6294" data-lon="10.9482" data-addr="Via Pietro Vivarelli 10 (Campus DIEF)" data-q="Crocetta - San Lazzaro - Modena Est">
+                                📍 Campus DIEF
+                            </button>
+                            <button type="button" class="btn btn-xs btn-light border small py-1 px-2 preset-loc"
+                                    data-lat="44.6463" data-lon="10.9255" data-addr="Piazza Grande, Modena" data-q="Centro Storico">
+                                📍 Piazza Grande
+                            </button>
+                            <button type="button" class="btn btn-xs btn-light border small py-1 px-2 preset-loc"
+                                    data-lat="44.6512" data-lon="10.9065" data-addr="Parco Enzo Ferrari, Modena" data-q="San Faustino - Madonnina - Quattro Ville">
+                                📍 Parco Ferrari
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin="" defer></script>
+<script src="{{ url_for('static', filename='js/form_validation.js') }}" defer></script>
+{% endblock %}

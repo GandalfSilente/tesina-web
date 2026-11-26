@@ -1,0 +1,15 @@
+# Ambiente virtuale Python e cache
+**/.venv
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# File temporanei sistema operativo
+.DS_Store
+Thumbs.db
+
+# Dati e strumenti locali
+codice/database/civicpulse.db
+codice/cloudflared
+codice/static/uploads/1794324010_IMG_1163.png

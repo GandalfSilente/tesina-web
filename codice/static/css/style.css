@@ -1,0 +1,410 @@
+/* ============================================================================
+ * CIVICPULSE MODENA - Design System & Foglio di Stile Principale
+ * Corso di Intelligenza Artificiale e Tecnologie Web (AA 2026-2027) - UNIMORE
+ * Usa CSS Custom Properties (:root), Flexbox, CSS Grid e Media Queries responsive
+ * ============================================================================ */
+
+:root {
+    --color-navy-900: #1b3556;
+    --color-navy-800: #25446b;
+    --color-navy-700: #3a5578;
+    --color-primary: #2b5947;
+    --color-primary-hover: #1f4234;
+    --color-accent: #b07224;
+    --color-success: #198754;
+    --color-warning: #d97706;
+    --color-danger: #dc3545;
+    --color-bg: #f5f4f0;
+    --color-surface: #ffffff;
+    --color-border: #d4d0c5;
+    --color-text: #22252a;
+    --color-text-muted: #5c636a;
+    --radius-md: 5px;
+    --radius-lg: 5px;
+    --shadow-soft: 0 1px 2px rgba(0, 0, 0, 0.04);
+    --shadow-hover: 0 2px 5px rgba(0, 0, 0, 0.08);
+
+    /* Override variabili Bootstrap 5.3 */
+    --bs-primary: #2b5947;
+    --bs-primary-rgb: 43, 89, 71;
+    --bs-info: #b07224;
+    --bs-info-rgb: 176, 114, 36;
+    --bs-link-color: #2b5947;
+    --bs-link-hover-color: #1f4234;
+    --bs-body-bg: #f5f4f0;
+    --bs-body-color: #22252a;
+}
+
+*, *::before, *::after {
+    box-sizing: border-box;
+}
+
+body {
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    background-color: var(--color-bg);
+    color: var(--color-text);
+    line-height: 1.55;
+}
+
+h1, h2, h3, h4, .navbar-brand {
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+}
+
+/* Override Bootstrap 5 per coerenza palette studente/comune */
+.btn-primary {
+    background-color: #2b5947;
+    border-color: #2b5947;
+    color: #ffffff;
+}
+
+.btn-primary:hover,
+.btn-primary:focus,
+.btn-primary:active {
+    background-color: #1f4234 !important;
+    border-color: #1f4234 !important;
+    color: #ffffff !important;
+}
+
+.btn-outline-primary {
+    color: #2b5947;
+    border-color: #2b5947;
+}
+
+.btn-outline-primary:hover {
+    background-color: #2b5947;
+    border-color: #2b5947;
+    color: #ffffff;
+}
+
+.btn-info {
+    background-color: #b07224;
+    border-color: #b07224;
+    color: #ffffff !important;
+}
+
+.btn-info:hover,
+.btn-info:focus,
+.btn-info:active {
+    background-color: #8f5b1b !important;
+    border-color: #8f5b1b !important;
+    color: #ffffff !important;
+}
+
+.text-info {
+    color: #8f5b1b !important;
+}
+
+.bg-info {
+    background-color: #e8dcc8 !important;
+    color: #5c3c10 !important;
+}
+
+.text-primary {
+    color: #2b5947 !important;
+}
+
+.skip-link {
+    background: var(--color-primary);
+    color: #fff;
+    padding: 0.5rem 1rem;
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 2000;
+}
+
+/* Header & Navbar */
+.site-header {
+    background-color: #ffffff;
+    border-top: 4px solid #2b5947;
+    border-bottom: 1px solid #d4d0c5;
+}
+
+.brand-badge {
+    width: 38px;
+    height: 38px;
+    border-radius: 4px;
+    background-color: #2b5947;
+    color: #ffffff;
+    font-size: 1.1rem;
+}
+
+.brand-subtitle {
+    font-size: 0.72rem;
+    color: #5c636a;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    margin-top: -2px;
+}
+
+.small-badge {
+    font-size: 0.65rem;
+    letter-spacing: 0.04em;
+}
+
+.navbar-light .navbar-nav .nav-link {
+    color: #333840;
+    font-weight: 500;
+    padding: 0.45rem 0.85rem;
+    border-radius: 4px;
+    transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.navbar-light .navbar-nav .nav-link:hover,
+.navbar-light .navbar-nav .nav-link.active {
+    color: #2b5947;
+    background: #edf3f0;
+}
+
+/* Indicatore Server-Sent Events (SSE) */
+.sse-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: 4px;
+    background: #edf3f0;
+    border: 1px solid #b7d1c6;
+    color: #1f4234;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.sse-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: #2b5947;
+}
+
+/* Hero Banner & Meteo Bar */
+.hero-section {
+    background-color: #ebe9e2;
+    color: #22252a;
+    padding: 1.5rem 0;
+    border-bottom: 1px solid #d4d0c5;
+}
+
+.weather-widget-card {
+    background-color: #ffffff;
+    border: 1px solid #d4d0c5;
+    border-radius: 6px;
+    padding: 1rem 1.2rem;
+    color: #22252a;
+}
+
+/* Uniforma le card Bootstrap nei template senza stile AI "floating" */
+.card.rounded-4 {
+    border-radius: var(--radius-md) !important;
+    border: 1px solid var(--color-border) !important;
+    box-shadow: var(--shadow-soft) !important;
+}
+
+/* KPI Strip Cards */
+.kpi-card {
+    background: var(--color-surface);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--color-border);
+    padding: 1.1rem 1.2rem;
+    box-shadow: var(--shadow-soft);
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.kpi-card:hover {
+    border-color: #9e998b;
+    box-shadow: var(--shadow-hover);
+}
+
+.kpi-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 5px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+}
+
+/* Mappa Interattiva Leaflet */
+#modena-map,
+#detail-map,
+#picker-map {
+    width: 100%;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--color-border);
+    z-index: 1;
+}
+
+#modena-map {
+    height: 430px;
+}
+
+#detail-map {
+    height: 300px;
+}
+
+#picker-map {
+    height: 320px;
+    cursor: crosshair;
+}
+
+/* Card Segnalazione (Report Card) */
+.report-card {
+    background: var(--color-surface);
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--color-border);
+    box-shadow: var(--shadow-soft);
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.report-card:hover {
+    box-shadow: var(--shadow-hover);
+    border-color: #9e998b;
+}
+
+.report-card-img-wrap {
+    position: relative;
+    height: 165px;
+    background: #e9ecef;
+    overflow: hidden;
+    border-bottom: 1px solid var(--color-border);
+}
+
+.report-card-img-wrap img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.report-code-pill {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    background: #22252a;
+    color: #f8fafc;
+    font-size: 0.74rem;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 4px;
+    letter-spacing: 0.03em;
+}
+
+.ai-score-pill {
+    position: absolute;
+    bottom: 10px;
+    right: 10px;
+    background: #2b5947;
+    color: #ffffff;
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    font-size: 0.74rem;
+    font-weight: 600;
+    padding: 3px 8px;
+    border-radius: 4px;
+}
+
+/* Badge Priorità e Stato */
+.badge-prio, .badge-status {
+    font-size: 0.73rem;
+    font-weight: 600;
+    padding: 0.3em 0.65em;
+    border-radius: 4px;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.prio-bassa { background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; }
+.prio-media { background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; }
+.prio-alta { background: #ffedd5; color: #c2410c; border: 1px solid #fed7aa; }
+.prio-critica { background: #fee2e2; color: #b91c1c; border: 1px solid #fecaca; }
+
+.status-aperta { background: #fef3c7; color: #92400e; border: 1px solid #fde68a; }
+.status-lavorazione { background: #dbeafe; color: #1e40af; border: 1px solid #bfdbfe; }
+.status-meteo { background: #e0e7ff; color: #3730a3; border: 1px solid #c7d2fe; }
+.status-risolta { background: #d1fae5; color: #065f46; border: 1px solid #a7f3d0; }
+.status-chiusa { background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; }
+
+/* Box AI Auto-Triage ("Sporcarsi le Mani") */
+.ai-triage-panel {
+    background-color: #2c3430;
+    color: #f5f4f0;
+    border-radius: var(--radius-lg);
+    border: 1px solid #414d47;
+    padding: 1.25rem;
+    box-shadow: var(--shadow-soft);
+}
+
+.ai-triage-panel .text-info {
+    color: #e6b873 !important;
+}
+
+.ai-triage-panel .btn-info {
+    background-color: #b07224;
+    border-color: #b07224;
+    color: #ffffff !important;
+}
+
+.urgency-meter-bg {
+    height: 10px;
+    background: rgba(255, 255, 255, 0.16);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.urgency-meter-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.25s ease, background-color 0.25s ease;
+}
+
+/* Timeline Commenti e Log */
+.comment-item {
+    border-left: 3px solid #adb5bd;
+    padding-left: 1rem;
+    margin-bottom: 1.1rem;
+}
+
+.comment-item.official-update {
+    border-left-color: #2b5947;
+    background: #edf3f0;
+    padding: 0.85rem 1rem;
+    border-radius: 0 5px 5px 0;
+}
+
+/* Footer */
+.site-footer {
+    background-color: #e9e7e0;
+    border-top: 2px solid #2b5947;
+    color: #2c3035;
+}
+
+.tech-pill {
+    display: inline-block;
+    font-size: 0.72rem;
+    padding: 2px 8px;
+    border-radius: 3px;
+    background: #ffffff;
+    color: #333840;
+    border: 1px solid #ccc8bc;
+}
+
+@media (max-width: 768px) {
+    #modena-map {
+        height: 310px;
+    }
+    .hero-section {
+        padding: 1.25rem 0;
+    }
+}

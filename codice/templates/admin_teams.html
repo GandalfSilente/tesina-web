@@ -1,0 +1,489 @@
+{% extends "base.html" %}
+
+{% block title %}Smistamento Compiti &amp; Squadre (Admin) • CivicPulse Modena{% endblock %}
+
+{% block extra_css %}
+<style>
+    .dispatch-report-card {
+        background: #ffffff;
+        border: 1.5px solid #cbd5e1;
+        border-left: 5px solid #0284c7;
+        border-radius: 12px;
+        padding: 0.9rem 1rem;
+        margin-bottom: 0.85rem;
+        cursor: grab;
+        transition: transform 0.16s ease, box-shadow 0.16s ease, opacity 0.16s ease;
+        user-select: none;
+    }
+    .dispatch-report-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 18px rgba(15, 23, 42, 0.09);
+    }
+    .dispatch-report-card.dragging {
+        opacity: 0.45;
+        cursor: grabbing;
+        transform: scale(0.98);
+    }
+    .dispatch-report-card.prio-border-critica { border-left-color: #dc2626; }
+    .dispatch-report-card.prio-border-alta { border-left-color: #f97316; }
+    .dispatch-report-card.prio-border-media { border-left-color: #0284c7; }
+    .dispatch-report-card.prio-border-bassa { border-left-color: #64748b; }
+
+    .team-dropzone {
+        border-radius: 14px;
+        padding: 1.1rem;
+        transition: all 0.2s ease;
+        min-height: 170px;
+        position: relative;
+    }
+    .team-dropzone.team-available {
+        background: #ffffff;
+        border: 2px solid #cbd5e1;
+        box-shadow: 0 4px 14px rgba(15, 23, 42, 0.05);
+    }
+    .team-dropzone.team-available.drag-over-valid {
+        background: #ecfdf5;
+        border: 2.5px dashed #10b981;
+        transform: scale(1.015);
+        box-shadow: 0 10px 24px rgba(16, 185, 129, 0.18);
+    }
+    .team-dropzone.team-unavailable {
+        background: #fef2f2;
+        border: 2px dashed #ef4444;
+        opacity: 0.86;
+        cursor: not-allowed;
+    }
+    .team-dropzone.team-unavailable.drag-over-blocked {
+        background: #fee2e2;
+        border: 2.5px solid #dc2626;
+        box-shadow: 0 0 0 4px rgba(220, 38, 38, 0.15);
+    }
+    .unavailable-banner {
+        background: #dc2626;
+        color: #ffffff;
+        font-weight: 800;
+        font-size: 0.78rem;
+        letter-spacing: 0.04em;
+        padding: 0.35rem 0.65rem;
+        border-radius: 8px;
+        display: inline-block;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <!-- HEADER ADMIN SMISTAMENTO & REGISTRAZIONE SQUADRE -->
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+        <div>
+            <span class="badge bg-warning text-dark fw-bold mb-1">
+                <i class="fa-solid fa-user-shield me-1"></i>AREA RISERVATA AMMINISTRATORE (ADMIN)
+            </span>
+            <h1 class="h3 fw-bold mb-1">Centrale Operativa: Assegnazione Compiti APERTI &amp; Squadre</h1>
+            <p class="text-muted small mb-0">
+                Trascina con il mouse (<strong>Drag &amp; Drop</strong>) un compito <strong>APERTO</strong> dalla colonna di sinistra sopra una squadra <strong>DISPONIBILE</strong> a destra per assegnarlo e avviarlo subito in lavorazione.
+            </p>
+        </div>
+        <button type="button" class="btn btn-primary fw-semibold shadow-sm" data-bs-toggle="modal" data-bs-target="#newTeamModal">
+            <i class="fa-solid fa-users-gear me-2"></i>+ Registra Nuova Squadra
+        </button>
+    </div>
+
+    <!-- Banner Feedback Operativo -->
+    <div id="dispatch-feedback" class="alert d-none shadow-sm small fw-semibold" role="alert"></div>
+
+    <div class="row g-4">
+        <!-- COLONNA SINISTRA: COMPITI APERTI TRASCINABILI -->
+        <div class="col-lg-5">
+            <div class="card border-0 shadow-sm rounded-4 p-3 h-100 bg-light">
+                <div class="d-flex justify-content-between align-items-center mb-3 pb-2 border-bottom">
+                    <h2 class="h6 fw-bold mb-0">
+                        <i class="fa-solid fa-circle-exclamation text-warning me-2"></i>Compiti APERTI da Assegnare
+                    </h2>
+                    <span id="open-reports-count" class="badge bg-warning text-dark rounded-pill">{{ open_reports|length }}</span>
+                </div>
+
+                <div id="open-reports-list">
+                    {% if open_reports %}
+                        {% for r in open_reports %}
+                            <article class="dispatch-report-card prio-border-{{ r.priority }}"
+                                     draggable="true"
+                                     data-report-id="{{ r.id }}"
+                                     data-report-code="{{ r.code }}"
+                                     data-report-title="{{ r.title }}">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <span class="badge bg-dark">
+                                        <i class="fa-solid fa-grip-vertical me-1 text-secondary"></i>{{ r.code }}
+                                    </span>
+                                    <span class="badge-prio prio-{{ r.priority }}">
+                                        {{ r.priority.upper() }} • AI {{ r.ai_urgency_score }}/100
+                                    </span>
+                                </div>
+
+                                <h3 class="h6 fw-bold mb-1">
+                                    <a href="{{ url_for('report_detail', report_id=r.id) }}" class="text-dark text-decoration-none">
+                                        {{ r.title }}
+                                    </a>
+                                </h3>
+                                <div class="small text-muted mb-2">
+                                    <i class="fa-solid fa-location-dot text-danger me-1"></i>{{ r.address }} ({{ r.quartiere }})
+                                </div>
+                                <div class="small text-secondary bg-light rounded p-2 mb-2">
+                                    <i class="fa-solid fa-wand-magic-sparkles text-info me-1"></i>
+                                    AI suggerisce: <strong>{{ r.team_name or 'Da assegnare' }}</strong>
+                                </div>
+
+                                <!-- Backup accessibile per smartphone/tablet senza mouse -->
+                                <div class="input-group input-group-sm mt-2 pt-2 border-top">
+                                    <select class="form-select form-select-sm fallback-team-select" aria-label="Assegna rapidamente a squadra">
+                                        <option value="">Assegna manualmente a...</option>
+                                        {% for t in teams %}
+                                            <option value="{{ t.id }}" {% if not t.is_available %}disabled{% endif %}>
+                                                {{ t.name }}{% if not t.is_available %} (AL MOMENTO INDISPONIBILE){% endif %}
+                                            </option>
+                                        {% endfor %}
+                                    </select>
+                                    <button type="button" class="btn btn-outline-primary btn-fallback-assign" data-report-id="{{ r.id }}">
+                                        Assegna
+                                    </button>
+                                </div>
+                            </article>
+                        {% endfor %}
+                    {% else %}
+                        <div id="empty-open-msg" class="text-center text-muted py-5">
+                            <i class="fa-solid fa-circle-check text-success fs-1 mb-2 d-block"></i>
+                            <p class="fw-semibold mb-1">Nessun compito APERTO in coda!</p>
+                            <small>Tutte le segnalazioni aperte sono già state assegnate o messe in lavorazione.</small>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- COLONNA DESTRA: SQUADRE COMUNALI (DROP ZONES) -->
+        <div class="col-lg-7">
+            <div class="card border-0 shadow-sm rounded-4 p-3 h-100">
+                <div class="d-flex justify-content-between align-items-center mb-3 pb-2 border-bottom">
+                    <h2 class="h6 fw-bold mb-0">
+                        <i class="fa-solid fa-users-gear text-primary me-2"></i>Squadre Operative Comunali (Rilascia qui il compito)
+                    </h2>
+                    <span class="small text-muted">
+                        <span class="badge bg-success me-1">● Disponibile</span>
+                        <span class="badge bg-danger">⛔ Indisponibile (Bloccata)</span>
+                    </span>
+                </div>
+
+                <div class="row g-3" id="teams-dropzones-grid">
+                    {% for t in teams %}
+                        <div class="col-md-6">
+                            <div class="team-dropzone h-100 {% if t.is_available %}team-available{% else %}team-unavailable{% endif %}"
+                                 data-team-id="{{ t.id }}"
+                                 data-team-name="{{ t.name }}"
+                                 data-available="{{ '1' if t.is_available else '0' }}">
+                                <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+                                    <div>
+                                        <h3 class="h6 fw-bold mb-0 text-dark">{{ t.name }}</h3>
+                                        <small class="text-muted">{{ t.department }}</small>
+                                    </div>
+                                    <span class="badge {% if t.is_available %}bg-success{% else %}bg-danger{% endif %} team-status-badge">
+                                        {% if t.is_available %}DISPONIBILE{% else %}NON DISPONIBILE{% endif %}
+                                    </span>
+                                </div>
+
+                                <p class="small text-secondary mb-2">{{ t.specialization }}</p>
+
+                                {% if not t.is_available %}
+                                    <div class="mt-2 mb-2">
+                                        <div class="unavailable-banner w-100 text-center">
+                                            <i class="fa-solid fa-ban me-1"></i>AL MOMENTO INDISPONIBILE
+                                        </div>
+                                        {% if t.effective_reason or t.effective_until %}
+                                            <div class="small text-danger mt-1 fw-semibold">
+                                                {% if t.effective_reason %}<i class="fa-solid fa-circle-info me-1"></i>{{ t.effective_reason }}{% endif %}
+                                                {% if t.effective_until %}<span class="d-block"><i class="fa-regular fa-clock me-1"></i>{{ t.effective_until }}</span>{% endif %}
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                {% else %}
+                                    <div class="small text-success fw-semibold border border-success border-opacity-25 bg-success bg-opacity-10 rounded p-2 text-center mb-2 drop-hint">
+                                        <i class="fa-solid fa-arrow-down-to-bracket me-1"></i>Trascina qui un compito APERTO (max 1 incarico attivo)
+                                    </div>
+                                {% endif %}
+
+                                <div class="d-flex justify-content-between align-items-center small text-muted pt-2 border-top mt-auto">
+                                    <span><i class="fa-solid fa-helmet-safety me-1"></i>{{ t.active_members }} tecnici</span>
+                                    <span>In carico attivi: <strong class="team-active-count text-dark">{{ t.active_assigned }}</strong></span>
+                                </div>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MODALE REGISTRAZIONE NUOVA SQUADRA -->
+<div class="modal fade" id="newTeamModal" tabindex="-1" aria-labelledby="newTeamModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow rounded-4">
+            <div class="modal-header bg-dark text-white rounded-top-4">
+                <h2 class="modal-title h5 fw-bold" id="newTeamModalLabel">
+                    <i class="fa-solid fa-users-gear text-info me-2"></i>Registra Nuova Squadra Comunale
+                </h2>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Chiudi"></button>
+            </div>
+            <form id="create-team-form">
+                <div class="modal-body p-4">
+                    <div id="create-team-error" class="alert alert-danger small d-none"></div>
+
+                    <div class="mb-3">
+                        <label for="team-name" class="form-label fw-semibold small">Nome Squadra *</label>
+                        <input type="text" id="team-name" name="name" class="form-control"
+                               placeholder="es. Squadra Pronto Intervento Sottopassi &amp; Ponti" required minlength="3">
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="team-dept" class="form-label fw-semibold small">Settore / Dipartimento *</label>
+                        <input type="text" id="team-dept" name="department" class="form-control"
+                               placeholder="es. Settore Lavori Pubblici Modena" required minlength="3">
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="team-spec" class="form-label fw-semibold small">Specializzazione Tecnica *</label>
+                        <textarea id="team-spec" name="specialization" rows="2" class="form-control"
+                                  placeholder="es. Controllo strutturale sottopassi, pompe idrovore e segnaletica di emergenza" required minlength="5"></textarea>
+                    </div>
+
+                    <div class="row g-3">
+                        <div class="col-md-8">
+                            <label for="team-email" class="form-label fw-semibold small">Email Operativa Squadra *</label>
+                            <input type="email" id="team-email" name="contact_email" class="form-control"
+                                   placeholder="es. sottopassi@comune.modena.demo.it" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="team-members" class="form-label fw-semibold small">N. Tecnici *</label>
+                            <input type="number" id="team-members" name="active_members" class="form-control" value="4" min="1" max="100" required>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light rounded-bottom-4">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Annulla</button>
+                    <button type="submit" class="btn btn-primary fw-semibold">
+                        <i class="fa-solid fa-check me-1"></i>Registra Squadra
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script defer>
+document.addEventListener("DOMContentLoaded", () => {
+    let draggedReportId = null;
+    let draggedReportCode = "";
+
+    const feedbackEl = document.getElementById("dispatch-feedback");
+    const openReportsList = document.getElementById("open-reports-list");
+    const openCountEl = document.getElementById("open-reports-count");
+
+    function showFeedback(message, type = "success") {
+        if (!feedbackEl) return;
+        feedbackEl.className = `alert alert-${type} shadow-sm small fw-semibold`;
+        feedbackEl.textContent = message;
+        feedbackEl.classList.remove("d-none");
+        setTimeout(() => {
+            feedbackEl.classList.add("d-none");
+        }, 5500);
+    }
+
+    async function assignReportToTeam(reportId, teamId) {
+        try {
+            const res = await fetch("/api/admin/assign-report", {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "Accept": "application/json" },
+                body: JSON.stringify({ report_id: reportId, team_id: teamId })
+            });
+            const data = await res.json();
+            if (!res.ok || data.status !== "ok") {
+                showFeedback(`⛔ ${data.message || "Impossibile assegnare il compito."}`, "danger");
+                return;
+            }
+
+            // Rimuovi la card dalla lista compiti APERTI
+            const card = document.querySelector(`.dispatch-report-card[data-report-id="${reportId}"]`);
+            if (card) card.remove();
+
+            const remaining = document.querySelectorAll(".dispatch-report-card").length;
+            if (openCountEl) openCountEl.textContent = remaining;
+            if (remaining === 0 && openReportsList) {
+                openReportsList.innerHTML = `
+                    <div id="empty-open-msg" class="text-center text-muted py-5">
+                        <i class="fa-solid fa-circle-check text-success fs-1 mb-2 d-block"></i>
+                        <p class="fw-semibold mb-1">Nessun compito APERTO in coda!</p>
+                        <small>Tutte le segnalazioni aperte sono già state assegnate o messe in lavorazione.</small>
+                    </div>`;
+            }
+
+            // Blocca subito la dropzone appena assegnata nel DOM senza dover ricaricare la pagina!
+            const dropzone = document.querySelector(`.team-dropzone[data-team-id="${teamId}"]`);
+            if (dropzone) {
+                dropzone.dataset.available = "0";
+                dropzone.classList.remove("team-available", "drag-over-valid");
+                dropzone.classList.add("team-unavailable");
+
+                const badge = dropzone.querySelector(".team-status-badge");
+                if (badge) {
+                    badge.className = "badge bg-danger team-status-badge";
+                    badge.textContent = "NON DISPONIBILE";
+                }
+                const hint = dropzone.querySelector(".drop-hint");
+                if (hint) {
+                    hint.outerHTML = `
+                        <div class="mt-2 mb-2">
+                            <div class="unavailable-banner w-100 text-center">
+                                <i class="fa-solid fa-ban me-1"></i>AL MOMENTO INDISPONIBILE
+                            </div>
+                            <div class="small text-danger mt-1 fw-semibold">
+                                <i class="fa-solid fa-circle-info me-1"></i>Incarico attivo: ${data.report.code} — ${data.report.title}
+                                <span class="d-block"><i class="fa-regular fa-clock me-1"></i>Fino a completamento lavoro</span>
+                            </div>
+                        </div>`;
+                }
+                const countEl = dropzone.querySelector(".team-active-count");
+                if (countEl) countEl.textContent = Number(countEl.textContent || 0) + 1;
+            }
+
+            // Disabilita la squadra anche nelle select di backup delle card rimaste
+            document.querySelectorAll(`.fallback-team-select option[value="${teamId}"]`).forEach(opt => {
+                opt.disabled = true;
+                if (!opt.textContent.includes("INDISPONIBILE")) {
+                    opt.textContent += " (AL MOMENTO INDISPONIBILE)";
+                }
+            });
+
+            showFeedback(
+                `✅ Compito ${data.report.code} assegnato a "${data.report.team_name}" e avviato IN LAVORAZIONE! Squadra occupata fino a completamento.`,
+                "success"
+            );
+        } catch (err) {
+            showFeedback("Errore di connessione al server durante l'assegnazione.", "danger");
+        }
+    }
+
+    // 1. Inizializzazione Drag sulle card APERTE
+    document.querySelectorAll(".dispatch-report-card").forEach(card => {
+        card.addEventListener("dragstart", (e) => {
+            draggedReportId = card.dataset.reportId;
+            draggedReportCode = card.dataset.reportCode;
+            card.classList.add("dragging");
+            e.dataTransfer.setData("text/plain", draggedReportId);
+            e.dataTransfer.effectAllowed = "move";
+        });
+        card.addEventListener("dragend", () => {
+            card.classList.remove("dragging");
+            draggedReportId = null;
+        });
+    });
+
+    // 2. Inizializzazione Dropzone sulle Squadre (lettura live di dataset.available)
+    document.querySelectorAll(".team-dropzone").forEach(zone => {
+        const teamId = zone.dataset.teamId;
+        const teamName = zone.dataset.teamName;
+
+        zone.addEventListener("dragover", (e) => {
+            e.preventDefault();
+            if (zone.dataset.available === "1") {
+                zone.classList.add("drag-over-valid");
+                e.dataTransfer.dropEffect = "move";
+            } else {
+                zone.classList.add("drag-over-blocked");
+                e.dataTransfer.dropEffect = "none";
+            }
+        });
+
+        zone.addEventListener("dragleave", () => {
+            zone.classList.remove("drag-over-valid", "drag-over-blocked");
+        });
+
+        zone.addEventListener("drop", (e) => {
+            e.preventDefault();
+            zone.classList.remove("drag-over-valid", "drag-over-blocked");
+
+            if (zone.dataset.available !== "1") {
+                showFeedback(
+                    `⛔ Impossibile scegliere "${teamName}": la squadra è AL MOMENTO INDISPONIBILE!`,
+                    "danger"
+                );
+                return;
+            }
+
+            const reportId = draggedReportId || e.dataTransfer.getData("text/plain");
+            if (reportId) {
+                assignReportToTeam(reportId, teamId);
+            }
+        });
+    });
+
+    // 3. Pulsanti Assegna manuali (fallback per smartphone / touch)
+    document.querySelectorAll(".btn-fallback-assign").forEach(btn => {
+        btn.addEventListener("click", () => {
+            const reportId = btn.dataset.reportId;
+            const select = btn.closest(".input-group").querySelector(".fallback-team-select");
+            const teamId = select ? select.value : "";
+            if (!teamId) {
+                showFeedback("Seleziona prima una squadra disponibile dall'elenco.", "warning");
+                return;
+            }
+            assignReportToTeam(reportId, teamId);
+        });
+    });
+
+    // 4. Form Registrazione Nuova Squadra
+    const createTeamForm = document.getElementById("create-team-form");
+    const createTeamError = document.getElementById("create-team-error");
+    if (createTeamForm) {
+        createTeamForm.addEventListener("submit", async (e) => {
+            e.preventDefault();
+            createTeamError.classList.add("d-none");
+
+            const payload = {
+                name: document.getElementById("team-name").value,
+                department: document.getElementById("team-dept").value,
+                specialization: document.getElementById("team-spec").value,
+                contact_email: document.getElementById("team-email").value,
+                active_members: document.getElementById("team-members").value
+            };
+
+            try {
+                const res = await fetch("/api/teams", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json", "Accept": "application/json" },
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+                if (!res.ok || data.status !== "ok") {
+                    createTeamError.textContent = data.message || "Errore durante la registrazione.";
+                    createTeamError.classList.remove("d-none");
+                    return;
+                }
+                window.location.reload();
+            } catch (err) {
+                createTeamError.textContent = "Errore di connessione al server.";
+                createTeamError.classList.remove("d-none");
+            }
+        });
+    }
+
+    // 5. Riutilizza l'unico canale SSE globale emesso da main.js (0 connessioni aggiuntive!)
+    window.addEventListener("civicpulse:sse", (event) => {
+        const data = event.detail || {};
+        if (["team_availability_changed", "team_created", "report_created"].includes(data.type)) {
+            setTimeout(() => window.location.reload(), 650);
+        }
+    });
+});
+</script>
+{% endblock %}

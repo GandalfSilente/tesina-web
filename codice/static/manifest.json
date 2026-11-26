@@ -1,0 +1,17 @@
+{
+  "name": "CivicPulse Modena - Smart City & AI Triage",
+  "short_name": "CivicPulse",
+  "description": "Piattaforma Web di Crowdsensing Urbano, Auto-Triage AI/NLP e Monitoraggio Interventi per il Comune di Modena (Tesina Tecnologie Web UNIMORE)",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "lang": "it-IT",
+  "icons": [
+    {
+      "src": "/static/uploads/demo_buca_dief.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}

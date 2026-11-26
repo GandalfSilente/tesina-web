@@ -1,0 +1,368 @@
+{% extends "base.html" %}
+
+{% block title %}Live Triage Board (React 19 SPA) • CivicPulse Modena{% endblock %}
+
+{% block extra_css %}
+<style>
+    .kanban-column {
+        background: #f1f5f9;
+        border-radius: 14px;
+        border: 2px solid #e2e8f0;
+        padding: 1rem;
+        min-height: 520px;
+        transition: background 0.2s ease, border-color 0.2s ease;
+    }
+    .kanban-column.drag-over {
+        background: #e0f2fe !important;
+        border: 2px dashed #0284c7 !important;
+    }
+    .kanban-card {
+        background: #ffffff;
+        border-radius: 12px;
+        border: 1px solid #e2e8f0;
+        padding: 0.95rem;
+        margin-bottom: 0.85rem;
+        box-shadow: 0 2px 8px rgba(15, 23, 42, 0.05);
+        transition: transform 0.18s ease, box-shadow 0.18s ease;
+        cursor: grab;
+        user-select: none;
+    }
+    .kanban-card:active {
+        cursor: grabbing;
+        opacity: 0.7;
+    }
+    .kanban-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 18px rgba(15, 23, 42, 0.1);
+    }
+</style>
+<!-- Configurazione ES Module ImportMap per React 19 (Convenzione Lab 07 & Esami TW 2026 UNIMORE) -->
+<script type="importmap">
+{
+    "imports": {
+        "react": "https://esm.sh/react@19.0.0",
+        "react-dom/client": "https://esm.sh/react-dom@19.0.0/client"
+    }
+}
+</script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <!-- Mount Point dell'Applicazione React 19 -->
+    <div id="react-kanban-root">
+        <div class="text-center py-5">
+            <div class="spinner-border text-primary mb-3" role="status"></div>
+            <p class="text-muted">Inizializzazione modulo Single Page Application (React 19) e sincronizzazione API REST...</p>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script type="text/babel" data-type="module">
+import React, { useState, useEffect } from "react";
+import { createRoot } from "react-dom/client";
+
+const COLUMNS = [
+    { key: "aperta", title: "Aperte (In Attesa)", badge: "bg-warning text-dark", icon: "fa-circle-exclamation" },
+    { key: "in_lavorazione", title: "In Lavorazione", badge: "bg-primary", icon: "fa-helmet-safety" },
+    { key: "sospesa_meteo", title: "Sospese Meteo", badge: "bg-info text-dark", icon: "fa-cloud-showers-heavy" },
+    { key: "risolta", title: "Risolte & Chiuse", badge: "bg-success", icon: "fa-circle-check" }
+];
+
+const PRIORITY_COLORS = {
+    critica: "prio-critica",
+    alta: "prio-alta",
+    media: "prio-media",
+    bassa: "prio-bassa"
+};
+
+function KanbanApp() {
+    const [reports, setReports] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
+    const [feedback, setFeedback] = useState(null);
+
+    // Stati per filtri combinati client-side in React
+    const [searchQuery, setSearchQuery] = useState("");
+    const [priorityFilter, setPriorityFilter] = useState("");
+    const [categoryFilter, setCategoryFilter] = useState("");
+    const [minUrgency, setMinUrgency] = useState(0);
+
+    // Stati per Drag & Drop nativo HTML5 delle card
+    const [draggedReportId, setDraggedReportId] = useState(null);
+    const [dragOverColumn, setDragOverColumn] = useState(null);
+
+    const fetchReports = async () => {
+        try {
+            setLoading(true);
+            const res = await fetch("/api/reports?sort_by=urgency");
+            if (!res.ok) throw new Error("Errore nel caricamento delle API REST (/api/reports)");
+            const data = await res.json();
+            setReports(data.reports || []);
+            setError(null);
+        } catch (err) {
+            setError(err.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchReports();
+    }, []);
+
+    // Avanzamento/Cambio Stato asincrono via Fetch API (POST /api/reports/<id>/status)
+    const handleStatusChange = async (reportId, newStatus, currentPriority) => {
+        try {
+            const res = await fetch(`/api/reports/${reportId}/status`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "Accept": "application/json" },
+                body: JSON.stringify({ status: newStatus, priority: currentPriority })
+            });
+            const data = await res.json();
+            if (res.ok && data.status === "ok") {
+                setReports(prev => prev.map(r => r.id === reportId ? { ...r, ...data.report } : r));
+                setFeedback({ type: "success", text: `Stato della pratica ${data.report.code} aggiornato a "${newStatus.replace('_', ' ').toUpperCase()}" via REST API.` });
+            } else {
+                setFeedback({ type: "danger", text: data.message || "Impossibile aggiornare lo stato." });
+            }
+        } catch (err) {
+            setFeedback({ type: "danger", text: "Errore di comunicazione con il server Flask." });
+        }
+    };
+
+    // Cambio Priorità rapido
+    const handlePriorityChange = async (reportId, currentStatus, newPriority) => {
+        try {
+            const res = await fetch(`/api/reports/${reportId}/status`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "Accept": "application/json" },
+                body: JSON.stringify({ status: currentStatus, priority: newPriority })
+            });
+            const data = await res.json();
+            if (res.ok && data.status === "ok") {
+                setReports(prev => prev.map(r => r.id === reportId ? { ...r, ...data.report } : r));
+                setFeedback({ type: "info", text: `Priorità della pratica ${data.report.code} impostata a "${newPriority.toUpperCase()}".` });
+            }
+        } catch (err) {
+            setFeedback({ type: "danger", text: "Errore nell'aggiornamento della priorità." });
+        }
+    };
+
+    // Filtraggio reattivo combinato
+    const filteredReports = reports.filter(r => {
+        const matchText = !searchQuery ||
+            r.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            r.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            r.quartiere.toLowerCase().includes(searchQuery.toLowerCase());
+        const matchPrio = !priorityFilter || r.priority === priorityFilter;
+        const matchCat = !categoryFilter || r.category === categoryFilter;
+        const matchUrgency = (r.ai_urgency_score || 0) >= Number(minUrgency);
+        return matchText && matchPrio && matchCat && matchUrgency;
+    });
+
+    return (
+        <div>
+            <div className="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+                <div>
+                    <span className="badge bg-info text-dark mb-1">
+                        <i className="fa-brands fa-react me-1"></i>Modulo Single Page Application (React 19 + REST API)
+                    </span>
+                    <h1 className="h3 fw-bold mb-1">Live Triage &amp; Kanban Board Operativa</h1>
+                    <p className="text-muted small mb-0">
+                        Interfaccia reattiva in <strong>React 19</strong> (<code>useState</code>, <code>useEffect</code>, <code>fetch()</code>): <strong>trascina con il mouse le schede tra le colonne (Drag &amp; Drop)</strong> oppure usa i selettori a tendina per cambiare lo stato dei cantieri all'istante senza ricaricare la pagina.
+                    </p>
+                </div>
+                <div className="d-flex gap-2">
+                    <button className="btn btn-outline-primary btn-sm" onClick={fetchReports}>
+                        <i className="fa-solid fa-rotate me-1"></i>Sincronizza API
+                    </button>
+                    <a href="/report/new" className="btn btn-primary btn-sm">
+                        <i className="fa-solid fa-plus me-1"></i>Nuova Pratica
+                    </a>
+                </div>
+            </div>
+
+            {feedback && (
+                <div className={`alert alert-${feedback.type} alert-dismissible fade show py-2 small shadow-sm`} role="alert">
+                    <i className="fa-solid fa-bolt me-2"></i>{feedback.text}
+                    <button type="button" className="btn-close" onClick={() => setFeedback(null)}></button>
+                </div>
+            )}
+
+            {/* Barra Filtri Reattiva React */}
+            <div className="card border-0 shadow-sm rounded-4 p-3 mb-4">
+                <div className="row g-3 align-items-center">
+                    <div className="col-md-4">
+                        <label className="form-label small fw-semibold mb-1">Filtra istantaneamente (Titolo, Codice, Quartiere)</label>
+                        <input
+                            type="search"
+                            className="form-control form-control-sm"
+                            placeholder="Digita per filtrare in tempo reale..."
+                            value={searchQuery}
+                            onChange={e => setSearchQuery(e.target.value)}
+                        />
+                    </div>
+                    <div className="col-sm-4 col-md-2">
+                        <label className="form-label small fw-semibold mb-1">Priorità</label>
+                        <select className="form-select form-select-sm" value={priorityFilter} onChange={e => setPriorityFilter(e.target.value)}>
+                            <option value="">Tutte</option>
+                            <option value="critica">Critica</option>
+                            <option value="alta">Alta</option>
+                            <option value="media">Media</option>
+                            <option value="bassa">Bassa</option>
+                        </select>
+                    </div>
+                    <div className="col-sm-4 col-md-3">
+                        <label className="form-label small fw-semibold mb-1">Categoria</label>
+                        <select className="form-select form-select-sm" value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)}>
+                            <option value="">Tutte le categorie</option>
+                            <option value="strade_viabilita">Strade e Viabilità</option>
+                            <option value="illuminazione_energia">Illuminazione ed Energia</option>
+                            <option value="idrico_allagamenti">Rete Idrica e Allagamenti</option>
+                            <option value="ambiente_verde">Verde Pubblico</option>
+                            <option value="rifiuti_decoro">Rifiuti e Decoro</option>
+                            <option value="sicurezza_arredo">Arredo e Accessibilità</option>
+                        </select>
+                    </div>
+                    <div className="col-sm-4 col-md-3">
+                        <label className="form-label small fw-semibold mb-1">
+                            Urgenza AI Minima: <strong className="text-primary">{minUrgency}/100</strong>
+                        </label>
+                        <input
+                            type="range"
+                            className="form-range"
+                            min="0"
+                            max="90"
+                            step="10"
+                            value={minUrgency}
+                            onChange={e => setMinUrgency(e.target.value)}
+                        />
+                    </div>
+                </div>
+            </div>
+
+            {loading ? (
+                <div className="text-center py-5">
+                    <div className="spinner-border text-primary"></div>
+                </div>
+            ) : error ? (
+                <div className="alert alert-danger">{error}</div>
+            ) : (
+                <div className="row g-3">
+                    {COLUMNS.map(col => {
+                        const colReports = filteredReports.filter(r =>
+                            col.key === "risolta" ? (r.status === "risolta" || r.status === "chiusa") : r.status === col.key
+                        );
+                        return (
+                            <div className="col-md-6 col-xl-3" key={col.key}>
+                                <div
+                                    className={`kanban-column ${dragOverColumn === col.key ? 'drag-over' : ''}`}
+                                    onDragOver={e => { e.preventDefault(); setDragOverColumn(col.key); }}
+                                    onDragLeave={() => setDragOverColumn(null)}
+                                    onDrop={e => {
+                                        e.preventDefault();
+                                        setDragOverColumn(null);
+                                        if (draggedReportId) {
+                                            const target = reports.find(x => x.id === draggedReportId);
+                                            if (target && target.status !== col.key) {
+                                                handleStatusChange(draggedReportId, col.key, target.priority);
+                                            }
+                                        }
+                                    }}
+                                >
+                                    <div className="d-flex justify-content-between align-items-center mb-3 pb-2 border-bottom">
+                                        <h2 className="h6 fw-bold mb-0">
+                                            <i className={`fa-solid ${col.icon} me-2 text-secondary`}></i>
+                                            {col.title}
+                                        </h2>
+                                        <span className={`badge ${col.badge} rounded-pill`}>{colReports.length}</span>
+                                    </div>
+
+                                    {colReports.length === 0 ? (
+                                        <div className="text-center text-muted small py-4 fst-italic">
+                                            Nessuna pratica in questa colonna (Trascina qui una scheda)
+                                        </div>
+                                    ) : (
+                                        colReports.map(r => (
+                                            <div
+                                                className="kanban-card"
+                                                key={r.id}
+                                                draggable={true}
+                                                onDragStart={() => setDraggedReportId(r.id)}
+                                                onDragEnd={() => setDraggedReportId(null)}
+                                                title="Trascina con il mouse per cambiare colonna (Drag & Drop)"
+                                            >
+                                                <div className="d-flex justify-content-between align-items-center mb-2">
+                                                    <span className="badge bg-dark">{r.code}</span>
+                                                    <span className={`badge-prio ${PRIORITY_COLORS[r.priority] || 'prio-media'}`}>
+                                                        {r.priority.toUpperCase()} • AI {r.ai_urgency_score}
+                                                    </span>
+                                                </div>
+
+                                                <h3 className="h6 fw-bold mb-1">
+                                                    <a href={`/report/${r.id}`} className="text-dark text-decoration-none">
+                                                        {r.title}
+                                                    </a>
+                                                </h3>
+
+                                                <div className="small text-muted mb-2">
+                                                    <i className="fa-solid fa-location-dot text-danger me-1"></i>{r.quartiere}
+                                                </div>
+
+                                                <div className="small text-secondary bg-light rounded p-2 mb-2">
+                                                    <i className="fa-solid fa-users-gear me-1 text-primary"></i>
+                                                    {r.team_name || "Squadra in assegnazione"}
+                                                </div>
+
+                                                {/* Controlli Reattivi per Spostamento Colonna e Priorità */}
+                                                <div className="row g-1 mt-2 pt-2 border-top">
+                                                    <div className="col-7">
+                                                        <select
+                                                            aria-label="Cambia stato"
+                                                            className="form-select form-select-sm"
+                                                            value={r.status}
+                                                            onChange={e => handleStatusChange(r.id, e.target.value, r.priority)}
+                                                        >
+                                                            <option value="aperta">➡ Aperta</option>
+                                                            <option value="in_lavorazione">➡ In Lavorazione</option>
+                                                            <option value="sospesa_meteo">➡ Sospesa Meteo</option>
+                                                            <option value="risolta">➡ Risolta</option>
+                                                        </select>
+                                                    </div>
+                                                    <div className="col-5">
+                                                        <select
+                                                            aria-label="Cambia priorità"
+                                                            className="form-select form-select-sm"
+                                                            value={r.priority}
+                                                            onChange={e => handlePriorityChange(r.id, r.status, e.target.value)}
+                                                        >
+                                                            <option value="bassa">Bassa</option>
+                                                            <option value="media">Media</option>
+                                                            <option value="alta">Alta</option>
+                                                            <option value="critica">Critica</option>
+                                                        </select>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+            )}
+        </div>
+    );
+}
+
+const rootEl = document.getElementById("react-kanban-root");
+if (rootEl) {
+    createRoot(rootEl).render(<KanbanApp />);
+}
+</script>
+{% endblock %}
