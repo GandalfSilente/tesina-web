@@ -7,9 +7,9 @@
 # - Se il server è ACCESO (ON)  -> Lo SPEGNE (OFF) e chiude il tunnel
 # ============================================================================
 
-ROOT_DIR=".."
-CODE_DIR="$ROOT_DIR/codice"
-PYTHON_BIN="$ROOT_DIR/.venv/bin/python"
+CODE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(dirname "$CODE_DIR")"
+PYTHON_BIN="$CODE_DIR/.venv/bin/python"
 APP_FILE="$CODE_DIR/app.py"
 QR_SCRIPT="$CODE_DIR/generate_qr_pdf.py"
 CLOUDFLARED_BIN="$CODE_DIR/cloudflared"
