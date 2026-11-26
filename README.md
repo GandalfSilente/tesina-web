@@ -16,6 +16,7 @@
 7. [Istruzioni di Installazione, Avvio e Test Automatici](#-7-istruzioni-di-installazione-avvio-e-test-automatici)
 8. [Lucidi della Presentazione (10 Minuti)](#-8-lucidi-della-presentazione-10-minuti)
 9. [Dichiarazione uso di AI (Template Ufficiale Specifiche AA 2026-27)](#-9-dichiarazione-uso-di-ai)
+10. [Corrispondenza con la griglia di valutazione](#rubric-evidence)
 
 ---
 
@@ -46,7 +47,7 @@ flowchart LR
         V6["Vista 6: Login RBAC & Switch Demo"]
         V7["Vista 7: Centrale Admin Drag & Drop Squadre"]
         V8["Vista 8: Console Operatore Disponibilità"]
-        SW["Service Worker PWA (sw.js Cache-First Static)"]
+        SW["Service Worker PWA (sw.js stale-while-revalidate static)"]
     end
 
     subgraph Server["Backend Python 3 + Flask 3 (codice/app.py)"]
@@ -87,7 +88,7 @@ flowchart LR
 - **Frontend**:
   - **HTML5 Semantico** (`<header>`, `<nav>`, `<main>`, `<section>`, `<article>`, `<aside>`, `<footer>`), **HTML5 Drag & Drop API** nativo e accessibilità (ARIA, skip-link, contrasto WCAG AA).
   - **CSS3 Moderno**: Custom Properties (`:root`), Flexbox, CSS Grid, Bootstrap 5.3, Font Awesome 6.5, Google Fonts (`Inter` & `Poppins`).
-  - **JavaScript ES6+ Vanilla**: Manipolazione DOM sicura (`createElement` / `textContent` anti-XSS), Fetch API asincrona, EventSource unico con CustomEvent (`civicpulse:sse`) e chiusura su `pagehide`, Service Worker API (`Cache-First` sugli asset `/static/`), HTML5 Geolocation.
+  - **JavaScript ES6+ Vanilla**: Manipolazione DOM sicura (`createElement` / `textContent` anti-XSS), Fetch API asincrona, EventSource unico con CustomEvent (`civicpulse:sse`) e chiusura su `pagehide`, Service Worker API (`stale-while-revalidate` sugli asset `/static/`), HTML5 Geolocation.
   - **React 19**: Modulo SPA dedicato (`/kanban`) con Hooks `useState`, `useEffect` e Drag & Drop nativo tra colonne operative tramite API REST.
 
 ---
@@ -102,6 +103,12 @@ Come richiesto dai criteri di valutazione, ogni scelta architetturale è stata g
 | **Database Relazionale SQLite3 (vs File CSV/JSON o MySQL esterno)** | File CSV/JSON *oppure* Server PostgreSQL/MySQL separato | A differenza dei file CSV (soggetti a race condition e privi di integrità referenziale), **SQLite3** garantisce transazioni **ACID**, chiavi esterne (`FOREIGN KEY`) e calcolo dinamico dei blocchi operativi (`1 solo incarico attivo per squadra`), mantenendo **portabilità zero-config** in un singolo file (`codice/database/civicpulse.db`). |
 | **Server-Sent Events (SSE) su Canale Unico (`civicpulse:sse`)** | Short Polling HTTP *oppure* WebSockets bidirezionali *oppure* SSE multipli per pagina | Per le notifiche dal server ai browser il flusso è **unidirezionale**. Usiamo un **solo `EventSource("/api/stream")` globale per tab** (con chiusura pulita su `pagehide` e propagazione interna tramite `CustomEvent`) per non saturare il limite dei 6 socket HTTP/1.1 del browser e auto-aggiornare PC e smartphone in tempo reale. |
 | **Motore AI/NLP Simbolico Deterministico (`ai_engine.py`)** | Dipendenza esclusiva da API LLM cloud a pagamento (ChatGPT/Gemini) | In un sistema critico cittadino il triage non deve bloccarsi se manca internet o una chiave API. Un **motore NLP Rule-Based con pesatura lessicale (`+3` titolo, `+2` descrizione) e Regex di criticità** calcola urgenza (0-100), SLA e *Explainable AI* con latenza $< 5\text{ ms}$, determinismo e trasparenza al 100%. |
+
+### Limiti noti e trade-off
+
+- **Auto-triage NLP**: usa parole chiave e regole deterministiche, non un modello addestrato; è spiegabile e funziona offline, ma può sbagliare con negazioni, sinonimi o contesti non previsti. Un'evoluzione richiederebbe un dataset etichettato e una valutazione misurabile.
+- **Geofencing**: il backend controlla una bounding box rettangolare, non il confine amministrativo esatto di Modena; può quindi accettare coordinate esterne al Comune che ricadono nel rettangolo. Per una validazione precisa servirebbe un poligono GIS ufficiale.
+- **SSE**: le code dei client sono in memoria nel singolo processo Flask; è adeguato alla demo a processo singolo, ma non sincronizza più worker e non conserva eventi dopo un riavvio. Per scalare servirebbe un broker condiviso.
 
 ---
 
@@ -120,8 +127,8 @@ Per soddisfare pienamente il secondo criterio di valutazione (**fino a 3 punti s
    - **Reverse Geocoding Automatico (`GET /api/geocode/reverse`) e *"Usa Posizione Attuale"***: cliccando la mappa o premendo il tasto GPS (`navigator.geolocation`) si autocompilano **Indirizzo**, **Quartiere** e coordinate.
 4. **Integrazione API Esterna Meteo (`Open-Meteo API` + `GET /api/weather`)**:
    - Connessione live alle previsioni meteo di Modena con caching (10 min), pre-riscaldamento asincrono all'avvio e fallback resiliente offline per la valutazione di sicurezza dei cantieri esterni.
-5. **Progressive Web App (PWA `sw.js` `v2.8`) & Data Visualization (`Chart.js`)**:
-   - Asset statici serviti *Cache-First* dal Service Worker, dashboard direzionale con 3 grafici Chart.js ed esportazione Open Data in **CSV** e **JSON**.
+5. **Progressive Web App (PWA `sw.js` `v3.0`) & Data Visualization (`Chart.js`)**:
+   - Asset statici serviti con strategia *stale-while-revalidate* dal Service Worker, dashboard direzionale con 3 grafici Chart.js ed esportazione Open Data in **CSV** e **JSON**.
 
 ---
 
@@ -134,6 +141,43 @@ Il database `codice/database/civicpulse.db` (definito in [`codice/database/schem
 - **`reports`** *(Entità CRUD Primaria)*: Segnalazioni urbane georeferenziate con codice univoco (`CPM-2026-XXX`), coordinate GPS, stato, priorità, punteggio urgenza AI, SLA stimato, sensibilità meteo e chiavi esterne verso `users` e `teams`.
 - **`comments`** *(Entità CRUD Secondaria)*: Diario operativo e commenti cittadini collegati in cascata (`ON DELETE CASCADE`) a ciascuna segnalazione.
 - **`report_upvotes`**: Tracciamento delle conferme civiche (*crowdsensing validation*).
+
+### Diagramma ER
+
+Il diagramma riassume le relazioni definite in [`codice/database/schema.sql`](codice/database/schema.sql); `report_upvotes` usa una chiave primaria composta da `report_id` e `user_id`.
+
+```mermaid
+erDiagram
+    TEAMS o|--o{ USERS : associates
+    USERS ||--o{ REPORTS : authors
+    TEAMS o|--o{ REPORTS : assigned_to
+    REPORTS ||--o{ COMMENTS : contains
+    USERS ||--o{ COMMENTS : writes
+    REPORTS ||--o{ REPORT_UPVOTES : receives
+    USERS ||--o{ REPORT_UPVOTES : casts
+
+    TEAMS {
+        int id PK
+    }
+    USERS {
+        int id PK
+        int team_id FK
+    }
+    REPORTS {
+        int id PK
+        int author_id FK
+        int assigned_team_id FK
+    }
+    COMMENTS {
+        int id PK
+        int report_id FK
+        int user_id FK
+    }
+    REPORT_UPVOTES {
+        int report_id PK, FK
+        int user_id PK, FK
+    }
+```
 
 ### Mappatura Completa delle Operazioni CRUD
 | Operazione | Entità `reports` (Segnalazioni) | Entità `comments` (Note & Diario Operativo) | Entità `teams` (Squadre Operative) |
@@ -188,7 +232,8 @@ L'applicazione implementa un modello rigoroso di **Role-Based Access Control (RB
 
 ### Struttura Pulita della Cartella
 - **`codice/`**: codice sorgente, test e script di supporto ([`app.py`](codice/app.py), [`database.py`](codice/database.py), [`ai_engine.py`](codice/ai_engine.py), [`templates/`](codice/templates/), [`static/`](codice/static/), [`tests/`](codice/tests/), [`toggle_server.sh`](codice/toggle_server.sh), [`generate_qr_pdf.py`](codice/generate_qr_pdf.py)).
-- **`presentazione/`** & **`esempi richieste/`**: lucidi PPTX/PDF, guida orale e testi pronti per la demo.
+- **`presentazione/`**: lucidi PPTX/PDF richiesti per la discussione.
+- La guida orale e gli esempi personali per la demo sono conservati localmente in `guida-orale/` e non vengono pubblicati nel repository.
 
 ### Installazione e avvio (Linux/macOS)
 
@@ -204,6 +249,8 @@ cd codice
 ```
 
 Se `codice/.venv` non esiste, lo script lo crea e installa i pacchetti da `codice/requirements.txt`; poi avvia il server. Nei successivi avvii basta ripetere `cd codice && ./avvia_progetto.sh`. Apri quindi <http://127.0.0.1:5000>; per fermare il server premi `Ctrl+C` nel terminale.
+
+Al primo avvio il database SQLite3 viene creato automaticamente da `codice/database/schema.sql` e popolato con squadre, utenti demo e segnalazioni di esempio; il file `civicpulse.db` è escluso dal repository perché è un artefatto locale.
 
 Per mantenere valide le sessioni tra riavvii, configura `CIVICPULSE_SECRET` con una chiave segreta personale prima di avviare l'app. Se non è impostata, l'app genera una chiave casuale a ogni avvio.
 
@@ -243,7 +290,8 @@ cd codice
 Come previsto dalle specifiche d'esame (*Modalità di Consegna e Discussione*), i lucidi della presentazione orale (10 minuti) sono inclusi direttamente all'interno del repository nella cartella [`presentazione/`](presentazione/):
 - 📄 **[`presentazione/Presentazione_Tesina_CivicPulse.pptx`](presentazione/Presentazione_Tesina_CivicPulse.pptx)** — Presentazione PowerPoint nativa (16:9).
 - 📄 **[`presentazione/Presentazione_Tesina_CivicPulse.pdf`](presentazione/Presentazione_Tesina_CivicPulse.pdf)** — Versione PDF pronta per la proiezione.
-- 🗣️ **[`presentazione/Guida_Discussione_Orale_10min.md`](presentazione/Guida_Discussione_Orale_10min.md)** — Traccia parlata slide-per-slide per i 10 minuti di esposizione + domande e risposte tecniche sul codice.
+
+La guida personale per l'esposizione e gli esempi di prova restano nella cartella locale `guida-orale/`; non sono necessari per il repository consegnato.
 
 ---
 
@@ -254,5 +302,17 @@ Si dichiara che per la realizzazione del presente progetto software ci si è avv
 - **Google Antigravity**: utilizzato come supporto nella scrittura del codice e della documentazione.
 - **GitHub Copilot**: utilizzato come supporto nella scrittura del codice e della documentazione.
 
-L'idea e la concezione di *CivicPulse Modena* sono originali dell'autore e non sono state sviluppate con strumenti di AI. Gli strumenti sopra elencati sono stati usati come supporto per la scrittura del codice e della documentazione, non per brainstorming o ideazione del progetto.
-L'autore dichiara di aver effettuato personalmente la verifica funzionale e di sicurezza del codice generato, assumendosi la piena e personale responsabilità del progetto presentato.
+L'idea e la concezione di *CivicPulse Modena* sono originali dell'autore e non sono state sviluppate con strumenti di AI. L'architettura del software, la logica di business, il modello RBAC, lo schema del database relazionale e il motore di triage NLP rimangono interamente frutto dell'elaborazione originale dell'autore. Gli strumenti sopra elencati sono stati usati come supporto per la scrittura del codice e della documentazione, non per brainstorming o ideazione del progetto.
+L'autore dichiara di aver riletto e compreso personalmente ogni porzione di codice prodotta con l'ausilio di strumenti di AI, di essere in grado di spiegarne il funzionamento durante la discussione orale e di aver effettuato personalmente la verifica funzionale e di sicurezza del codice generato, assumendosi la piena e personale responsabilità del progetto presentato.
+
+### Dichiarazione di provenienza del progetto
+Il presente progetto è stato sviluppato **ex novo** per la tesina di Tecnologie Web AA 2026-2027: non deriva da progetti realizzati in precedenza in altre materie o in altri ambiti e non riutilizza codice o idee da essi. Tutti i componenti (backend Flask, persistenza SQLite, viste Jinja2/React, motore NLP, integrazioni esterne e documentazione) sono stati realizzati specificamente per CivicPulse Modena.
+
+<a id="rubric-evidence"></a>
+## 10. Corrispondenza con la griglia di valutazione
+
+| Criterio e punteggio massimo | Evidenze nel progetto |
+|---|---|
+| **Architettura e funzionalità — 3 punti** | README: architettura, trade-off, schema e API; `codice/app.py`, `codice/database.py`, `codice/database/schema.sql`; test CRUD in `codice/tests/test_app.py`. |
+| **Auto-apprendimento e nuove tecnologie — 3 punti** | README §4 e sezioni sui limiti; `codice/ai_engine.py` (NLP), `codice/static/sw.js` (PWA), `codice/templates/kanban_react.html` (React), endpoint SSE, geocoding e meteo in `codice/app.py`. |
+| **Presentazione e discussione orale — 4 punti** | Slide in `presentazione/` e demo dei flussi principali. Chiarezza, rispetto dei 10 minuti e padronanza del codice si verificano durante la discussione, non sono dimostrabili dal repository da solo. |
