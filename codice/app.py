@@ -527,7 +527,7 @@ def report_edit(report_id: int):
 
     is_staff = user["role"] in ("operator", "admin")
     raw_team_id = request.form.get("assigned_team_id")
-    if is_staff:
+    if user["role"] == "admin":
         if raw_team_id is not None and str(raw_team_id).strip() != "":
             try:
                 target_team_id = int(raw_team_id)
@@ -897,7 +897,19 @@ def api_update_report(report_id: int):
         merged["status"] = existing["status"]
         merged["assigned_team_id"] = existing.get("assigned_team_id")
     else:
-        raw_team = merged.get("assigned_team_id")
+        if user["role"] != "admin" and "assigned_team_id" in payload:
+            raw_req_team = payload.get("assigned_team_id")
+            try:
+                req_team_id = int(raw_req_team) if raw_req_team is not None and str(raw_req_team).strip() != "" else None
+            except (TypeError, ValueError):
+                req_team_id = raw_req_team
+            if req_team_id != existing.get("assigned_team_id"):
+                return jsonify({
+                    "status": "forbidden",
+                    "message": "La riassegnazione della squadra è riservata all'Amministratore (Admin).",
+                }), 403
+
+        raw_team = existing.get("assigned_team_id") if user["role"] != "admin" else merged.get("assigned_team_id")
         if raw_team is None or str(raw_team).strip() == "":
             target_team_id = None
         else:
@@ -993,13 +1005,21 @@ def api_update_report_status(report_id: int):
     if new_priority not in PRIORITIES:
         return jsonify({"status": "error", "message": "Priorità non valida"}), 400
 
-    # Risolve e valida l'ID della squadra assegnata
+    # Risolve e valida l'ID della squadra assegnata (cambio squadra riservato ad Admin)
     target_team_id = existing.get("assigned_team_id")
     if new_team is not None and str(new_team).strip() != "":
         try:
-            target_team_id = int(new_team)
+            parsed_team_id = int(new_team)
         except (TypeError, ValueError):
-            target_team_id = existing.get("assigned_team_id")
+            parsed_team_id = existing.get("assigned_team_id")
+        if user["role"] != "admin" and parsed_team_id != existing.get("assigned_team_id"):
+            msg = "La riassegnazione della squadra è riservata all'Amministratore (Admin)."
+            if request.accept_mimetypes.best == "application/json" or request.is_json:
+                return jsonify({"status": "forbidden", "message": msg}), 403
+            flash(msg, "danger")
+            return redirect(url_for("report_detail", report_id=report_id))
+        if user["role"] == "admin":
+            target_team_id = parsed_team_id
 
     if target_team_id:
         target_team = db.get_team_by_id(target_team_id, get_db_path())

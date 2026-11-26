@@ -57,7 +57,8 @@
 
                             {% if current_user and current_user.role == 'admin' %}
                                 <form method="POST" action="{{ url_for('report_delete', report_id=report.id) }}"
-                                      onsubmit="return confirm('Sei sicuro di voler eliminare definitivamente la segnalazione {{ report.code }}? Azione riservata ad Admin.');">
+                                      class="js-confirm-form"
+                                      data-confirm="Sei sicuro di voler eliminare definitivamente la segnalazione {{ report.code }}? Azione riservata ad Admin.">
                                     <button type="submit" class="btn btn-sm btn-outline-danger" title="Elimina definitivamente (Riservato Admin)">
                                         <i class="fa-solid fa-trash-can me-1"></i>Elimina Pratica (Admin)
                                     </button>
@@ -147,12 +148,13 @@
                                     <!-- Pulsanti Modifica / Elimina Commento (Riservati all'Autore o ad Admin) -->
                                     {% if current_user and (current_user.id == c.author_id or current_user.role == 'admin') %}
                                         <div class="d-flex gap-1">
-                                            <button type="button" class="btn btn-sm btn-link text-decoration-none p-1"
-                                                    onclick="document.getElementById('edit-box-{{ c.id }}').classList.toggle('d-none')">
+                                            <button type="button" class="btn btn-sm btn-link text-decoration-none p-1 js-toggle-comment-edit"
+                                                    data-target="edit-box-{{ c.id }}">
                                                 <i class="fa-solid fa-pen"></i> Modifica
                                             </button>
-                                            <form method="POST" action="{{ url_for('api_remove_comment', comment_id=c.id) }}" class="d-inline"
-                                                  onsubmit="return confirm('Rimuovere questo commento?');">
+                                            <form method="POST" action="{{ url_for('api_remove_comment', comment_id=c.id) }}"
+                                                  class="d-inline js-confirm-form"
+                                                  data-confirm="Rimuovere questo commento?">
                                                 <button type="submit" class="btn btn-sm btn-link text-danger text-decoration-none p-1">
                                                     <i class="fa-solid fa-trash"></i> Elimina
                                                 </button>
@@ -320,8 +322,14 @@ document.addEventListener("DOMContentLoaded", function () {
             maxZoom: 19,
             attribution: "&copy; OpenStreetMap contributors"
         }).addTo(map);
+        const popupWrap = document.createElement("div");
+        const strongEl = document.createElement("strong");
+        strongEl.textContent = mapEl.dataset.code || "";
+        popupWrap.appendChild(strongEl);
+        popupWrap.appendChild(document.createElement("br"));
+        popupWrap.appendChild(document.createTextNode(mapEl.dataset.title || ""));
         L.marker([lat, lon]).addTo(map)
-            .bindPopup("<strong>" + mapEl.dataset.code + "</strong><br>" + mapEl.dataset.title)
+            .bindPopup(popupWrap)
             .openPopup();
     }
 });

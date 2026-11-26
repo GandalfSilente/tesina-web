@@ -228,6 +228,16 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const marker = L.marker([initLat, initLon], { draggable: true }).addTo(map);
 
+        function openSafeMarkerPopup(heading, detail) {
+            const wrap = document.createElement("div");
+            const strongEl = document.createElement("strong");
+            strongEl.textContent = heading;
+            wrap.appendChild(strongEl);
+            wrap.appendChild(document.createElement("br"));
+            wrap.appendChild(document.createTextNode(detail));
+            marker.bindPopup(wrap).openPopup();
+        }
+
         async function setCoordsAndResolveAddress(lat, lon, customAddress = null, customQuartiere = null, originLabel = "Mappa") {
             const numLat = Number(lat);
             const numLon = Number(lon);
@@ -259,7 +269,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 addressInput.classList.remove("is-invalid");
                 if (addressFeedback) addressFeedback.textContent = "";
                 if (customQuartiere) quartiereSelect.value = customQuartiere;
-                marker.bindPopup(`<strong>Indirizzo selezionato (Comune di Modena):</strong><br>${customAddress}`).openPopup();
+                openSafeMarkerPopup("Indirizzo selezionato (Comune di Modena):", customAddress);
                 showGeoStatus(`✓ Indirizzo impostato automaticamente (${originLabel}): ${customAddress}`);
                 return;
             }
@@ -278,7 +288,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     lonInput.value = prevLon;
                     marker.setLatLng(lastValidLatLng);
                     map.panTo(lastValidLatLng);
-                    marker.bindPopup(`<strong>⚠️ Fuori dal Comune di Modena</strong><br>${data.message || "Seleziona un punto nel Comune di Modena."}`).openPopup();
+                    openSafeMarkerPopup("⚠️ Fuori dal Comune di Modena", data.message || "Seleziona un punto nel Comune di Modena.");
                     showGeoStatus(`⚠️ ${data.message || "Il punto selezionato non appartiene al Comune di Modena."}`, true);
                     return;
                 }
@@ -293,7 +303,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     if (loc.quartiere) {
                         quartiereSelect.value = loc.quartiere;
                     }
-                    marker.bindPopup(`<strong>📍 Via più vicina rilevata:</strong><br>${loc.address}`).openPopup();
+                    openSafeMarkerPopup("📍 Via più vicina rilevata:", loc.address);
                     showGeoStatus(`✓ Indirizzo compilato automaticamente da ${originLabel}: ${loc.address}`);
                 }
             } catch (err) {

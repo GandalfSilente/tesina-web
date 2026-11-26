@@ -99,6 +99,11 @@ def test_api_reports_crud_lifecycle(client):
     )
     assert res_update_citizen.status_code == 200
 
+    # 3c-bis. Operatore: non può riassegnare la squadra (riservato ad Admin -> 403)
+    client.post("/login", data={"username": "operatore", "password": "operatore123"})
+    assert client.put(f"/api/reports/{report_id}", json={"assigned_team_id": 6}).status_code == 403
+    assert client.post(f"/api/reports/{report_id}/status", json={"assigned_team_id": 6}).status_code == 403
+
     # 3d. Admin può aggiornare stato, priorità e squadra assegnata (squadra 6 libera nel seed)
     client.post("/login", data={"username": "admin", "password": "admin123"})
     update_payload = {

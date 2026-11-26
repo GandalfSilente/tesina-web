@@ -6,8 +6,36 @@
 document.addEventListener("DOMContentLoaded", () => {
     initServerSentEvents();
     initUpvoteButtons();
+    initUiActions();
     registerServiceWorker();
 });
+
+/**
+ * Azioni UI globali disaccoppiate (Principio dei Tre Layer, zero handler inline HTML)
+ */
+function initUiActions() {
+    document.addEventListener("submit", (e) => {
+        const form = e.target.closest(".js-confirm-form");
+        if (!form) return;
+        const msg = form.dataset.confirm;
+        if (msg && !window.confirm(msg)) {
+            e.preventDefault();
+        }
+    });
+
+    document.addEventListener("click", (e) => {
+        const toggleBtn = e.target.closest(".js-toggle-comment-edit");
+        if (toggleBtn && toggleBtn.dataset.target) {
+            const box = document.getElementById(toggleBtn.dataset.target);
+            if (box) box.classList.toggle("d-none");
+        }
+    });
+
+    const printBtn = document.getElementById("btn-print-dashboard");
+    if (printBtn) {
+        printBtn.addEventListener("click", () => window.print());
+    }
+}
 
 /**
  * 1. Connessione Real-Time tramite Server-Sent Events (EventSource /api/stream)

@@ -341,16 +341,34 @@ document.addEventListener("DOMContentLoaded", () => {
                 }
                 const hint = dropzone.querySelector(".drop-hint");
                 if (hint) {
-                    hint.outerHTML = `
-                        <div class="mt-2 mb-2">
-                            <div class="unavailable-banner w-100 text-center">
-                                <i class="fa-solid fa-ban me-1"></i>AL MOMENTO INDISPONIBILE
-                            </div>
-                            <div class="small text-danger mt-1 fw-semibold">
-                                <i class="fa-solid fa-circle-info me-1"></i>Incarico attivo: ${data.report.code} — ${data.report.title}
-                                <span class="d-block"><i class="fa-regular fa-clock me-1"></i>Fino a completamento lavoro</span>
-                            </div>
-                        </div>`;
+                    const wrap = document.createElement("div");
+                    wrap.className = "mt-2 mb-2";
+
+                    const banner = document.createElement("div");
+                    banner.className = "unavailable-banner w-100 text-center";
+                    const banIcon = document.createElement("i");
+                    banIcon.className = "fa-solid fa-ban me-1";
+                    banner.appendChild(banIcon);
+                    banner.appendChild(document.createTextNode("AL MOMENTO INDISPONIBILE"));
+
+                    const details = document.createElement("div");
+                    details.className = "small text-danger mt-1 fw-semibold";
+                    const infoIcon = document.createElement("i");
+                    infoIcon.className = "fa-solid fa-circle-info me-1";
+                    details.appendChild(infoIcon);
+                    details.appendChild(document.createTextNode(`Incarico attivo: ${data.report.code} — ${data.report.title}`));
+
+                    const untilSpan = document.createElement("span");
+                    untilSpan.className = "d-block";
+                    const clockIcon = document.createElement("i");
+                    clockIcon.className = "fa-regular fa-clock me-1";
+                    untilSpan.appendChild(clockIcon);
+                    untilSpan.appendChild(document.createTextNode("Fino a completamento lavoro"));
+                    details.appendChild(untilSpan);
+
+                    wrap.appendChild(banner);
+                    wrap.appendChild(details);
+                    hint.replaceWith(wrap);
                 }
                 const countEl = dropzone.querySelector(".team-active-count");
                 if (countEl) countEl.textContent = Number(countEl.textContent || 0) + 1;

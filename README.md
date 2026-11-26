@@ -86,7 +86,7 @@ flowchart LR
 - **Frontend**:
   - **HTML5 Semantico** (`<header>`, `<nav>`, `<main>`, `<section>`, `<article>`, `<aside>`, `<footer>`), **HTML5 Drag & Drop API** nativo e accessibilità (ARIA, skip-link, contrasto WCAG AA).
   - **CSS3 Moderno**: Custom Properties (`:root`), Flexbox, CSS Grid, Bootstrap 5.3, Font Awesome 6.5, Google Fonts (`Inter` & `Poppins`).
-  - **JavaScript ES6+ Vanilla**: Manipolazione DOM sicura (`createElement` / `textContent` anti-XSS), Fetch API asincrona, EventSource unico con CustomEvent (`civicpulse:sse`) e chiusura su `pagehide`, Service Worker API (`stale-while-revalidate` sugli asset `/static/`), HTML5 Geolocation.
+  - **JavaScript ES6+ Vanilla**: Manipolazione DOM sicura (`createElement` / `textContent` anti-XSS), event listener disaccoppiati (zero handler inline HTML, Principio dei Tre Layer), Fetch API asincrona, EventSource unico con CustomEvent (`civicpulse:sse`) e chiusura su `pagehide`, Service Worker API (`stale-while-revalidate` sugli asset `/static/`), HTML5 Geolocation.
   - **React 19**: Modulo SPA dedicato (`/kanban`) con Hooks `useState`, `useEffect` e Drag & Drop nativo tra colonne operative tramite API REST.
 
 ---
@@ -192,7 +192,7 @@ L'applicazione implementa un modello rigoroso di **Role-Based Access Control (RB
 | Ruolo Utente | Profilo Demo | Viste & Azioni Principali | Permessi sulle Segnalazioni | Gestione Stato & Squadre |
 | :--- | :--- | :--- | :--- | :--- |
 | **Cittadino (`citizen`)** | `cittadino` / `cittadino123` | Home Mappa, Dettaglio, Form `/report/new` (AI + GPS) | Invio nuove pratiche, upvote crowdsensing, modifica *solo proprie pratiche* e *propri commenti*. **Eliminazione NEGATA**. | Sola consultazione (pannello stato protetto da lucchetto). |
-| **Operatore Tecnico (`operator`)** | `operatore` / `operatore123` | **Console Disponibilità Squadra (`/operator/availability`)**, Kanban React (Drag & Drop) | Presa in carico, cambio stato lavori, completamento rapido (**Segna Lavoro Completato**), **Note Tecniche Ufficiali** con badge blu. **Eliminazione NEGATA**. | Può impostare Disponibile / Non Disponibile (con motivo e orario) **solo per la propria squadra associata** (HTTP `403` su altre squadre). |
+| **Operatore Tecnico (`operator`)** | `operatore` / `operatore123` | **Console Disponibilità Squadra (`/operator/availability`)**, Kanban React (Drag & Drop) | Presa in carico, cambio stato lavori, completamento rapido (**Segna Lavoro Completato**), **Note Tecniche Ufficiali** con badge blu. **Eliminazione NEGATA**. | Può impostare Disponibile / Non Disponibile (con motivo e orario) **solo per la propria squadra associata** (`HTTP 403` su altre squadre); riassegnazione squadra sulle pratiche riservata ad Admin (`HTTP 403`). |
 | **Amministratore (`admin`)** | `admin` / `admin123` | **Centrale Smistamento Drag & Drop & Registra Squadre (`/admin/teams`)**, Control Room `/dashboard` | Controllo completo, moderazione commenti e **ELIMINAZIONE DEFINITIVA PRATICHE** (unica figura autorizzata). | Registra nuove squadre comunali e assegna i compiti **APERTI** alle squadre disponibili tramite **Drag & Drop** (avviandoli `in_lavorazione`). |
 
 > **Regole di Sicurezza & Logica Operativa Server-Side**:
@@ -207,8 +207,8 @@ L'applicazione implementa un modello rigoroso di **Role-Based Access Control (RB
 | `GET` | `/api/reports` | Elenco segnalazioni con filtri query (`search`, `category`, `status`, `priority`, `quartiere`, `sort_by`) | `application/json` |
 | `POST` | `/api/reports` | Creazione nuova segnalazione con calcolo automatico AI Triage | `application/json` (`201 Created`) |
 | `GET` | `/api/reports/<id>` | Dettaglio singola segnalazione inclusi metadati squadra e array `comments` | `application/json` |
-| `PUT` | `/api/reports/<id>` | Aggiornamento completo di una segnalazione esistente e ricalcolo AI *(Autore per i dati base; Operatore/Admin per stato e squadra: 401/403)* | `application/json` |
-| `POST` / `PATCH` | `/api/reports/<id>/status` | Cambio stato operativo (incluso **Segna Lavoro Completato** -> `risolta`) con verifica 1-incarico-per-squadra | `application/json` |
+| `PUT` | `/api/reports/<id>` | Aggiornamento completo di una segnalazione esistente e ricalcolo AI *(Autore: dati base; Operatore: stato/priorità; Admin: anche squadra — 401/403)* | `application/json` |
+| `POST` / `PATCH` | `/api/reports/<id>/status` | Cambio stato operativo (incluso **Segna Lavoro Completato** -> `risolta`) con verifica 1-incarico-per-squadra *(Operatore/Admin; cambio squadra solo Admin: 401/403)* | `application/json` |
 | `DELETE` | `/api/reports/<id>` | Eliminazione definitiva della segnalazione e dei commenti associati *(Solo Admin: 401/403)* | `application/json` |
 | `GET` | `/api/teams` | Elenco squadre con stato disponibilità effettiva (`is_available`, `is_busy`, `busy_report`) | `application/json` |
 | `POST` | `/api/teams` | Registrazione nuova squadra comunale *(Solo Admin)* + notifica SSE | `application/json` (`201 Created`) |

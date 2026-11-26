@@ -120,8 +120,13 @@
                                     </select>
                                 </div>
                                 <div class="col-md-6">
-                                    <label for="assigned_team_id" class="form-label fw-semibold">Squadra Assegnata</label>
-                                    <select id="assigned_team_id" name="assigned_team_id" class="form-select">
+                                    <label for="assigned_team_id" class="form-label fw-semibold">
+                                        Squadra Assegnata
+                                        {% if current_user.role != 'admin' %}
+                                            <small class="text-muted fw-normal">(riservata ad Admin)</small>
+                                        {% endif %}
+                                    </label>
+                                    <select id="assigned_team_id" name="assigned_team_id" class="form-select" {% if current_user.role != 'admin' %}disabled{% endif %}>
                                         {% for t in teams %}
                                             <option value="{{ t.id }}" {% if form_data.assigned_team_id == t.id %}selected{% endif %}>
                                                 {{ t.name }}
