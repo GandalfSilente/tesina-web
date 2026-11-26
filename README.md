@@ -1,4 +1,4 @@
-# 🏙️ CivicPulse Modena — Piattaforma Smart City di Crowdsensing Urbano, Auto-Triage AI/NLP e Gestione Interventi Real-Time
+# CivicPulse Modena — Piattaforma Smart City di Crowdsensing Urbano, Auto-Triage AI/NLP e Gestione Interventi Real-Time
 
 > **Progetto Individuale (Tesina) di Tecnologie Web — AA 2026-2027**  
 > **Corso Integrato**: Intelligenza Artificiale e Tecnologie Web (6 CFU) — Docente: **Prof.ssa Laura Po**  
@@ -6,21 +6,19 @@
 
 ---
 
-## 📌 Indice
-1. [Obiettivo del Progetto e Problema Risolto](#-1-obiettivo-del-progetto-e-problema-risolto)
-2. [Architettura del Sistema e Stack Tecnologico](#-2-architettura-del-sistema-e-stack-tecnologico)
-3. [Motivazione Critica delle Scelte Progettuali e Trade-off](#-3-motivazione-critica-delle-scelte-progettuali-e-trade-off)
-4. [Criterio "Sporcarsi le Mani" (Tecnologie Approfondite in Autonomia)](#-4-criterio-sporcarsi-le-mani-tecnologie-approfondite-in-autonomia)
-5. [Schema del Database Relazionale (SQLite3) e Funzionalità CRUD](#-5-schema-del-database-relazionale-sqlite3-e-funzionalit-crud)
-6. [Documentazione Servizi RESTful API](#-6-documentazione-servizi-restful-api)
-7. [Istruzioni di Installazione, Avvio e Test Automatici](#-7-istruzioni-di-installazione-avvio-e-test-automatici)
-8. [Lucidi della Presentazione (10 Minuti)](#-8-lucidi-della-presentazione-10-minuti)
-9. [Dichiarazione uso di AI (Template Ufficiale Specifiche AA 2026-27)](#-9-dichiarazione-uso-di-ai)
-10. [Corrispondenza con la griglia di valutazione](#rubric-evidence)
+## Indice
+1. [Obiettivo del Progetto e Problema Risolto](#1-obiettivo-del-progetto-e-problema-risolto)
+2. [Architettura del Sistema e Stack Tecnologico](#2-architettura-del-sistema-e-stack-tecnologico)
+3. [Motivazione Critica delle Scelte Progettuali e Trade-off](#3-motivazione-critica-delle-scelte-progettuali-e-trade-off)
+4. [Criterio "Sporcarsi le Mani" (Tecnologie Approfondite in Autonomia)](#4-criterio-sporcarsi-le-mani-tecnologie-approfondite-in-autonomia)
+5. [Schema del Database Relazionale (SQLite3) e Funzionalità CRUD](#5-schema-del-database-relazionale-sqlite3-e-funzionalit-crud)
+6. [Documentazione Servizi RESTful API](#6-documentazione-servizi-restful-api)
+7. [Struttura del Repository, Avvio Rapido e Test Automatici](#7-struttura-del-repository-avvio-rapido-e-test-automatici)
+8. [Dichiarazione uso di AI (Template Ufficiale Specifiche AA 2026-27)](#8-dichiarazione-uso-di-ai)
 
 ---
 
-## 🎯 1. Obiettivo del Progetto e Problema Risolto
+## 1. Obiettivo del Progetto e Problema Risolto
 
 Nella gestione della manutenzione urbana (comuni, campus universitari, reti civiche), le segnalazioni dei cittadini relative a **buche stradali, guasti all'illuminazione pubblica, alberi pericolanti, caditoie ostruite o barriere architettoniche** soffrono tradizionalmente di quattro criticità strutturali:
 1. **Frammentazione e assenza di georeferenziazione precisa**: segnalazioni inviate via email o telefono prive di coordinate GPS esatte;
@@ -32,7 +30,7 @@ Nella gestione della manutenzione urbana (comuni, campus universitari, reti civi
 
 ---
 
-## 🏗️ 2. Architettura del Sistema e Stack Tecnologico
+## 2. Architettura del Sistema e Stack Tecnologico
 
 L'applicazione adotta un'architettura **Client-Server Multi-Tier ibrida** (Server-Side Rendering con **Jinja2** per le viste documentali/SEO + Single Page Application in **React 19** per l'operatività Kanban ad alta interattività), disaccoppiata tramite un livello di **API RESTful JSON**.
 
@@ -93,7 +91,7 @@ flowchart LR
 
 ---
 
-## ⚖️ 3. Motivazione Critica delle Scelte Progettuali e Trade-off
+## 3. Motivazione Critica delle Scelte Progettuali e Trade-off
 
 Come richiesto dai criteri di valutazione, ogni scelta architetturale è stata guidata dall'analisi dei **trade-off ingegneristici**:
 
@@ -112,7 +110,7 @@ Come richiesto dai criteri di valutazione, ogni scelta architetturale è stata g
 
 ---
 
-## 🚀 4. Criterio "Sporcarsi le Mani" (Tecnologie Approfondite in Autonomia)
+## 4. Criterio "Sporcarsi le Mani" (Tecnologie Approfondite in Autonomia)
 
 Per soddisfare pienamente il secondo criterio di valutazione (**fino a 3 punti su 10 per l'approfondimento autonomo di moduli non spiegati a lezione**), sono stati progettati e integrati **5 moduli avanzati**:
 
@@ -132,7 +130,7 @@ Per soddisfare pienamente il secondo criterio di valutazione (**fino a 3 punti s
 
 ---
 
-## 🗄️ 5. Schema del Database Relazionale (SQLite3) e Funzionalità CRUD
+## 5. Schema del Database Relazionale (SQLite3) e Funzionalità CRUD
 
 Il database `codice/database/civicpulse.db` (definito in [`codice/database/schema.sql`](codice/database/schema.sql)) comprende **5 tabelle relazionali** con integrità referenziale attiva (`PRAGMA foreign_keys = ON`):
 
@@ -187,7 +185,7 @@ erDiagram
 | **UPDATE** | Form `/report/<id>/edit`, Pannello Operatore, Kanban React (Drag & Drop), Smistamento Admin `/admin/teams` (Drag & Drop), API `PUT /api/reports/<id>`, `POST /api/reports/<id>/status` e `POST /api/admin/assign-report` | Modifica inline in `/report/<id>` + API `PUT /api/comments/<id>` | Console Operatore `/operator/availability` + API `POST /api/teams/<id>/availability` |
 | **DELETE** | Pulsante Elimina `/report/<id>/delete` + API `DELETE /api/reports/<id>` *(Riservato Admin)* | Pulsante Elimina in `/report/<id>` + API `DELETE /api/comments/<id>/delete` | — |
 
-### 🔒 Sicurezza Applicativa, Modello RBAC & Gestione Squadre (*Single-Active-Job Lock*)
+### Sicurezza Applicativa, Modello RBAC & Gestione Squadre (*Single-Active-Job Lock*)
 
 L'applicazione implementa un modello rigoroso di **Role-Based Access Control (RBAC)** a difesa dell'integrità dei dati civici e operativi:
 
@@ -197,12 +195,12 @@ L'applicazione implementa un modello rigoroso di **Role-Based Access Control (RB
 | **Operatore Tecnico (`operator`)** | `operatore` / `operatore123` | **Console Disponibilità Squadra (`/operator/availability`)**, Kanban React (Drag & Drop) | Presa in carico, cambio stato lavori, completamento rapido (**Segna Lavoro Completato**), **Note Tecniche Ufficiali** con badge blu. **Eliminazione NEGATA**. | Può impostare Disponibile / Non Disponibile (con motivo e orario) **solo per la propria squadra associata** (HTTP `403` su altre squadre). |
 | **Amministratore (`admin`)** | `admin` / `admin123` | **Centrale Smistamento Drag & Drop & Registra Squadre (`/admin/teams`)**, Control Room `/dashboard` | Controllo completo, moderazione commenti e **ELIMINAZIONE DEFINITIVA PRATICHE** (unica figura autorizzata). | Registra nuove squadre comunali e assegna i compiti **APERTI** alle squadre disponibili tramite **Drag & Drop** (avviandoli `in_lavorazione`). |
 
-> 🛡️ **Regole di Sicurezza & Logica Operativa Server-Side**:
+> **Regole di Sicurezza & Logica Operativa Server-Side**:
 > - **Eliminazione Pratiche Riservata ad Admin**: `POST /report/<id>/delete` e `DELETE /api/reports/<id>` bloccano utenti non loggati (**HTTP `401`**) e utenti cittadini/operatori (**HTTP `403`**). Lato frontend, il pulsante *"Elimina"* compare solo se `current_user.role == 'admin'`.
 > - **Vincolo 1 Solo Incarico Attivo per Squadra (*Single-Active-Job Lock*)**: quando una squadra riceve un incarico (stato `in_lavorazione` o `sospesa_meteo`), risulta **automaticamente `AL MOMENTO INDISPONIBILE`** (riquadro rosso evidente in `/admin/teams`, drop bloccato lato UI e rifiuto **HTTP `400`** lato API su `/api/admin/assign-report` e `/api/reports/<id>/status`). L'operatore non può rimettere la squadra disponibile finché non completa il lavoro (`risolta`/`chiusa`); al completamento, la squadra si sblocca e torna disponibile in automatico con notifica **SSE** verso l'Admin.
 > - **Geofencing Comune di Modena**: mappa Leaflet (`maxBounds` + `maxBoundsViscosity: 1.0` + `minZoom: 12`) e backend (`validate_report_payload` e `reverse_geocode_modena`) vincolati al perimetro di Modena (`Lat 44.5850–44.7150`, `Lon 10.8350–11.0150`), con rifiuto **HTTP `400`** fuori comune.
 
-## 🔌 6. Documentazione Servizi RESTful API
+## 6. Documentazione Servizi RESTful API
 
 | Metodo HTTP | Endpoint | Descrizione Funzionale | Formato Risposta |
 | :--- | :--- | :--- | :--- |
@@ -228,7 +226,7 @@ L'applicazione implementa un modello rigoroso di **Role-Based Access Control (RB
 
 ---
 
-## 💻 7. Struttura del Repository, Avvio Rapido e Test Automatici
+## 7. Struttura del Repository, Avvio Rapido e Test Automatici
 
 ### Struttura Pulita della Cartella
 - **`codice/`**: codice sorgente, test e script di supporto ([`app.py`](codice/app.py), [`database.py`](codice/database.py), [`ai_engine.py`](codice/ai_engine.py), [`templates/`](codice/templates/), [`static/`](codice/static/), [`tests/`](codice/tests/), [`toggle_server.sh`](codice/toggle_server.sh), [`generate_qr_pdf.py`](codice/generate_qr_pdf.py)).
@@ -266,7 +264,7 @@ cd tesina-web/codice
 
 Il launcher grafico `ON-OFF Server.desktop` è una scorciatoia facoltativa solo per la configurazione locale e non è incluso nel repository. Per una nuova copia o un clone usa le istruzioni da terminale qui sopra.
 
-### 🌐 Accesso da Altri Dispositivi (Mac, Smartphone, Tablet) & PDF con QR Code
+### Accesso da Altri Dispositivi (Mac, Smartphone, Tablet) & PDF con QR Code
 Per la demo su altri dispositivi, `toggle_server.sh` può avviare un tunnel HTTPS. L'indirizzo e gli eventuali file con i QR Code vengono generati localmente e non sono inclusi nel repository, perché dipendono dalla sessione e dalla rete. Il tunnel è disponibile solo mentre il processo resta attivo. Le segnalazioni inviate da telefono aggiornano la mappa e l'elenco sul PC tramite SSE.
 
 ### Credenziali Demo Preconfigurate (Accessibili anche con 1 clic dalla pagina `/login`)
@@ -285,17 +283,7 @@ cd codice
 
 ---
 
-## 📊 8. Lucidi della Presentazione (10 Minuti)
-
-Come previsto dalle specifiche d'esame (*Modalità di Consegna e Discussione*), i lucidi della presentazione orale (10 minuti) sono inclusi direttamente all'interno del repository nella cartella [`presentazione/`](presentazione/):
-- 📄 **[`presentazione/Presentazione_Tesina_CivicPulse.pptx`](presentazione/Presentazione_Tesina_CivicPulse.pptx)** — Presentazione PowerPoint nativa (16:9).
-- 📄 **[`presentazione/Presentazione_Tesina_CivicPulse.pdf`](presentazione/Presentazione_Tesina_CivicPulse.pdf)** — Versione PDF pronta per la proiezione.
-
-La guida personale per l'esposizione e gli esempi di prova restano nella cartella locale `guida-orale/`; non sono necessari per il repository consegnato.
-
----
-
-## 🤖 9. Dichiarazione uso di AI
+## 8. Dichiarazione uso di AI
 
 ### Dichiarazione uso di AI
 Si dichiara che per la realizzazione del presente progetto software ci si è avvalsi dell'ausilio dei seguenti strumenti di Intelligenza Artificiale Generativa:
@@ -308,11 +296,3 @@ L'autore dichiara di aver riletto e compreso personalmente ogni porzione di codi
 ### Dichiarazione di provenienza del progetto
 Il presente progetto è stato sviluppato **ex novo** per la tesina di Tecnologie Web AA 2026-2027: non deriva da progetti realizzati in precedenza in altre materie o in altri ambiti e non riutilizza codice o idee da essi. Tutti i componenti (backend Flask, persistenza SQLite, viste Jinja2/React, motore NLP, integrazioni esterne e documentazione) sono stati realizzati specificamente per CivicPulse Modena.
 
-<a id="rubric-evidence"></a>
-## 10. Corrispondenza con la griglia di valutazione
-
-| Criterio e punteggio massimo | Evidenze nel progetto |
-|---|---|
-| **Architettura e funzionalità — 3 punti** | README: architettura, trade-off, schema e API; `codice/app.py`, `codice/database.py`, `codice/database/schema.sql`; test CRUD in `codice/tests/test_app.py`. |
-| **Auto-apprendimento e nuove tecnologie — 3 punti** | README §4 e sezioni sui limiti; `codice/ai_engine.py` (NLP), `codice/static/sw.js` (PWA), `codice/templates/kanban_react.html` (React), endpoint SSE, geocoding e meteo in `codice/app.py`. |
-| **Presentazione e discussione orale — 4 punti** | Slide in `presentazione/` e demo dei flussi principali. Chiarezza, rispetto dei 10 minuti e padronanza del codice si verificano durante la discussione, non sono dimostrabili dal repository da solo. |
