@@ -229,7 +229,7 @@ def generate_pdf(public_url: str, lan_url: str, local_url: str, output_path: str
         ("Home Page & Mappa Modena", f"{local_url}/"),
         ("Nuova Segnalazione + AI + GPS", f"{local_url}/report/new"),
         ("Dashboard Analytics & Meteo", f"{local_url}/dashboard"),
-        ("Kanban Board React 18 (SPA)", f"{local_url}/kanban"),
+        ("Kanban Board React 19 (SPA)", f"{local_url}/kanban"),
     ]
     draw_access_page(
         c=c,

@@ -107,7 +107,7 @@
                             </div>
                         </div>
 
-                        {% if is_edit %}
+                        {% if is_edit and current_user and current_user.role in ('operator', 'admin') %}
                             <div class="row g-3 mb-3">
                                 <div class="col-md-6">
                                     <label for="status" class="form-label fw-semibold">Stato Operativo</label>

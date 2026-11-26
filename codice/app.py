@@ -525,21 +525,55 @@ def report_edit(report_id: int):
             teams=teams,
         )
 
+    is_staff = user["role"] in ("operator", "admin")
+    raw_team_id = request.form.get("assigned_team_id")
+    if is_staff:
+        if raw_team_id is not None and str(raw_team_id).strip() != "":
+            try:
+                target_team_id = int(raw_team_id)
+            except (TypeError, ValueError):
+                target_team_id = existing.get("assigned_team_id")
+        else:
+            target_team_id = existing.get("assigned_team_id")
+    else:
+        target_team_id = existing.get("assigned_team_id")
+
     form_data = {
         "title": request.form.get("title", existing["title"]).strip(),
         "description": request.form.get("description", existing["description"]).strip(),
         "category": request.form.get("category", existing["category"]).strip(),
         "priority": request.form.get("priority", existing["priority"]).strip(),
-        "status": request.form.get("status", existing["status"]).strip(),
+        "status": request.form.get("status", existing["status"]).strip() if is_staff else existing["status"],
         "address": request.form.get("address", existing["address"]).strip(),
         "quartiere": request.form.get("quartiere", existing["quartiere"]).strip(),
         "latitude": request.form.get("latitude", str(existing["latitude"])).strip(),
         "longitude": request.form.get("longitude", str(existing["longitude"])).strip(),
-        "assigned_team_id": request.form.get("assigned_team_id") or existing["assigned_team_id"],
+        "assigned_team_id": target_team_id,
         "image_url": existing["image_url"],
     }
 
     errors = validate_report_payload(form_data, is_update=True)
+    if is_staff and target_team_id:
+        target_team = db.get_team_by_id(target_team_id, get_db_path())
+        if not target_team:
+            errors.append("La squadra selezionata non esiste.")
+        else:
+            team_changed = target_team_id != existing.get("assigned_team_id")
+            if team_changed and not target_team.get("is_available", True):
+                busy = target_team.get("busy_report")
+                errors.append(
+                    f"La squadra '{target_team['name']}' ha già un incarico in corso ({busy['code']}) ed è indisponibile."
+                    if busy
+                    else f"La squadra '{target_team['name']}' è AL MOMENTO INDISPONIBILE."
+                )
+            if form_data["status"] in ("in_lavorazione", "sospesa_meteo"):
+                busy = target_team.get("busy_report")
+                if busy and int(busy["id"]) != int(report_id):
+                    errors.append(
+                        f"La squadra '{target_team['name']}' può gestire 1 solo incarico alla volta (sta già lavorando su {busy['code']})."
+                    )
+                if not target_team.get("manual_available", True) and existing.get("status") == "aperta":
+                    errors.append(f"La squadra '{target_team['name']}' è contrassegnata come AL MOMENTO INDISPONIBILE.")
     if errors:
         return (
             render_template(
@@ -571,6 +605,7 @@ def report_edit(report_id: int):
         file.save(os.path.join(app.config["UPLOAD_FOLDER"], safe_name))
         form_data["image_url"] = f"/static/uploads/{safe_name}"
 
+    was_active = existing.get("status") in ("in_lavorazione", "sospesa_meteo")
     updated = db.update_report(report_id, form_data, get_db_path())
     broadcast_realtime_event(
         "report_updated",
@@ -578,6 +613,15 @@ def report_edit(report_id: int):
         f"Stato: {STATUSES[updated['status']]['label']} • Priorità: {PRIORITIES[updated['priority']]['label']}",
         {"report_id": updated["id"], "status": updated["status"], "priority": updated["priority"]},
     )
+    if was_active and updated["status"] in ("risolta", "chiusa") and updated.get("assigned_team_id"):
+        refreshed_team = db.get_team_by_id(updated["assigned_team_id"], get_db_path())
+        if refreshed_team and refreshed_team.get("is_available"):
+            broadcast_realtime_event(
+                "team_availability_changed",
+                f"🟢 Squadra Libera: {refreshed_team['name']}",
+                f"Lavoro su {updated['code']} completato! La squadra è tornata DISPONIBILE per nuovi incarichi.",
+                {"team": refreshed_team},
+            )
     flash(f"Segnalazione {updated['code']} aggiornata correttamente.", "success")
     return redirect(url_for("report_detail", report_id=report_id))
 
@@ -817,17 +861,85 @@ def api_create_report():
 
 @app.route("/api/reports/<int:report_id>", methods=["PUT"])
 def api_update_report(report_id: int):
-    """PUT /api/reports/<id> - Aggiorna una segnalazione esistente via JSON API (CRUD Update)."""
+    """PUT /api/reports/<id> - Aggiorna una segnalazione esistente via JSON API (CRUD Update) con controllo RBAC."""
     existing = db.get_report_by_id(report_id, get_db_path())
     if not existing:
         return jsonify({"status": "error", "message": "Segnalazione non trovata"}), 404
 
+    user = get_current_user()
+    if not user:
+        return jsonify({"status": "unauthorized", "message": "Autenticazione richiesta per modificare una segnalazione."}), 401
+
+    if user["role"] not in ("operator", "admin") and user["id"] != existing.get("author_id"):
+        return jsonify({
+            "status": "forbidden",
+            "message": "Operazione non consentita: solo l'autore della segnalazione, un Operatore o un Admin possono modificarla.",
+        }), 403
+
     payload = request.get_json(silent=True) or {}
     merged = {**existing, **payload}
+
+    if user["role"] == "citizen":
+        status_changed = "status" in payload and payload.get("status") != existing["status"]
+        team_changed = False
+        if "assigned_team_id" in payload:
+            raw_team = payload.get("assigned_team_id")
+            try:
+                req_team_id = int(raw_team) if raw_team is not None and str(raw_team).strip() != "" else None
+            except (TypeError, ValueError):
+                req_team_id = raw_team
+            team_changed = req_team_id != existing.get("assigned_team_id")
+        if status_changed or team_changed:
+            return jsonify({
+                "status": "forbidden",
+                "message": "La modifica dello stato operativo o della squadra è riservata a Operatori Tecnici e Amministratori.",
+            }), 403
+        merged["status"] = existing["status"]
+        merged["assigned_team_id"] = existing.get("assigned_team_id")
+    else:
+        raw_team = merged.get("assigned_team_id")
+        if raw_team is None or str(raw_team).strip() == "":
+            target_team_id = None
+        else:
+            try:
+                target_team_id = int(raw_team)
+            except (TypeError, ValueError):
+                return jsonify({"status": "error", "message": "Parametro assigned_team_id non valido."}), 400
+
+        if target_team_id:
+            target_team = db.get_team_by_id(target_team_id, get_db_path())
+            if not target_team:
+                return jsonify({"status": "error", "message": "Squadra non trovata"}), 404
+
+            team_changed = target_team_id != existing.get("assigned_team_id")
+            if team_changed and not target_team.get("is_available", True):
+                busy = target_team.get("busy_report")
+                msg = (
+                    f"La squadra '{target_team['name']}' ha già un incarico in corso ({busy['code']}) ed è indisponibile fino al completamento."
+                    if busy
+                    else f"La squadra '{target_team['name']}' è AL MOMENTO INDISPONIBILE e non può ricevere nuovi incarichi."
+                )
+                return jsonify({"status": "error", "message": msg}), 400
+
+            if merged.get("status") in ("in_lavorazione", "sospesa_meteo"):
+                busy = target_team.get("busy_report")
+                if busy and int(busy["id"]) != int(report_id):
+                    return jsonify({
+                        "status": "error",
+                        "message": f"La squadra '{target_team['name']}' può gestire 1 solo incarico alla volta (sta già lavorando su {busy['code']}). Completa prima quello!",
+                    }), 400
+                if not target_team.get("manual_available", True) and existing.get("status") == "aperta":
+                    return jsonify({
+                        "status": "error",
+                        "message": f"La squadra '{target_team['name']}' è contrassegnata come AL MOMENTO INDISPONIBILE.",
+                    }), 400
+        merged["assigned_team_id"] = target_team_id
+
     errors = validate_report_payload(merged, is_update=True)
     if errors:
         return jsonify({"status": "error", "errors": errors}), 400
 
+    was_active = existing.get("status") in ("in_lavorazione", "sospesa_meteo")
     updated = db.update_report(report_id, merged, get_db_path())
     broadcast_realtime_event(
         "report_updated",
@@ -835,6 +947,15 @@ def api_update_report(report_id: int):
         f"Nuovo stato: {STATUSES[updated['status']]['label']}",
         {"report_id": updated["id"], "status": updated["status"]},
     )
+    if was_active and updated["status"] in ("risolta", "chiusa") and updated.get("assigned_team_id"):
+        refreshed_team = db.get_team_by_id(updated["assigned_team_id"], get_db_path())
+        if refreshed_team and refreshed_team.get("is_available"):
+            broadcast_realtime_event(
+                "team_availability_changed",
+                f"🟢 Squadra Libera: {refreshed_team['name']}",
+                f"Lavoro su {updated['code']} completato! La squadra è tornata DISPONIBILE per nuovi incarichi.",
+                {"team": refreshed_team},
+            )
     return jsonify({"status": "ok", "report": updated})
 
 

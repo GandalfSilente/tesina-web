@@ -78,11 +78,34 @@ def test_api_reports_crud_lifecycle(client):
     assert created["code"].startswith("CPM-2026-")
     assert created["ai_urgency_score"] >= 60  # Rileva "perdita importante" e "allagamento"
 
-    # 3. UPDATE segnalazione
+    # 3. UPDATE segnalazione con verifica RBAC
+    # 3a. Utente non autenticato -> 401
+    res_update_anon = client.put(f"/api/reports/{report_id}", json={"title": "Tentativo non autenticato"})
+    assert res_update_anon.status_code == 401
+
+    # 3b. Altro cittadino non autore -> 403
+    client.post("/login", data={"username": "giulia_b", "password": "cittadino123"})
+    res_update_other = client.put(f"/api/reports/{report_id}", json={"title": "Tentativo da altro cittadino"})
+    assert res_update_other.status_code == 403
+
+    # 3c. Autore cittadino (id=3): non può cambiare status (403), può modificare il titolo (200)
+    client.post("/login", data={"username": "cittadino", "password": "cittadino123"})
+    res_update_status_citizen = client.put(f"/api/reports/{report_id}", json={"status": "in_lavorazione"})
+    assert res_update_status_citizen.status_code == 403
+
+    res_update_citizen = client.put(
+        f"/api/reports/{report_id}",
+        json={"title": "Perdita acqua potabile Via Emilia Est (Segnalata da cittadino)"},
+    )
+    assert res_update_citizen.status_code == 200
+
+    # 3d. Admin può aggiornare stato, priorità e squadra assegnata (squadra 6 libera nel seed)
+    client.post("/login", data={"username": "admin", "password": "admin123"})
     update_payload = {
         "title": "Perdita acqua potabile Via Emilia Est (Riparazione in corso)",
         "status": "in_lavorazione",
         "priority": "critica",
+        "assigned_team_id": 6,
     }
     res_update = client.put(f"/api/reports/{report_id}", json=update_payload)
     assert res_update.status_code == 200
@@ -97,6 +120,7 @@ def test_api_reports_crud_lifecycle(client):
 
     # 5. SICUREZZA RBAC SU DELETE:
     # 5a. Tentativo di eliminazione da utente NON autenticato -> Bloccato con 401
+    client.get("/logout")
     res_del_anon = client.delete(f"/api/reports/{report_id}")
     assert res_del_anon.status_code == 401
 

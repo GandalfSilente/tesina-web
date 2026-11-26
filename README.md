@@ -207,7 +207,7 @@ L'applicazione implementa un modello rigoroso di **Role-Based Access Control (RB
 | `GET` | `/api/reports` | Elenco segnalazioni con filtri query (`search`, `category`, `status`, `priority`, `quartiere`, `sort_by`) | `application/json` |
 | `POST` | `/api/reports` | Creazione nuova segnalazione con calcolo automatico AI Triage | `application/json` (`201 Created`) |
 | `GET` | `/api/reports/<id>` | Dettaglio singola segnalazione inclusi metadati squadra e array `comments` | `application/json` |
-| `PUT` | `/api/reports/<id>` | Aggiornamento completo di una segnalazione esistente e ricalcolo AI | `application/json` |
+| `PUT` | `/api/reports/<id>` | Aggiornamento completo di una segnalazione esistente e ricalcolo AI *(Autore per i dati base; Operatore/Admin per stato e squadra: 401/403)* | `application/json` |
 | `POST` / `PATCH` | `/api/reports/<id>/status` | Cambio stato operativo (incluso **Segna Lavoro Completato** -> `risolta`) con verifica 1-incarico-per-squadra | `application/json` |
 | `DELETE` | `/api/reports/<id>` | Eliminazione definitiva della segnalazione e dei commenti associati *(Solo Admin: 401/403)* | `application/json` |
 | `GET` | `/api/teams` | Elenco squadre con stato disponibilità effettiva (`is_available`, `is_busy`, `busy_report`) | `application/json` |
